@@ -18,6 +18,7 @@ test("exports the public customer routes", async () => {
     ["/account", "Your workshops, all in one place"],
     ["/account/private-quote", "Your tailored workshop is ready"],
     ["/account/waitlist", "Your waitlist offer is ready"],
+    ["/guides", "Guides"],
     ["/staff/invite", "Accept your workspace invitation"],
     ["/privacy", "Privacy policy"],
     ["/terms", "Terms of service"],

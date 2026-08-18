@@ -33,6 +33,7 @@ Identity and noindex routes:
 
 - `/sign-in`, `/auth/callback`
 - `/account`, `/account/bookings`, `/account/waitlist`, `/account/private-quote`
+- `/guides` (confirmed customers and staff)
 - `/checkout/success`, `/checkout/cancel`
 - `/staff/invite`
 - `/admin`
