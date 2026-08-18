@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export type AdminAction =
   | "catalog_list"
   | "course_upsert"
+  | "course_price_update"
   | "session_upsert"
   | "private_requests_list"
   | "private_request_update"
@@ -23,6 +24,8 @@ export type AdminAction =
   | "operations_status"
   | "automation_jobs_list"
   | "automation_job_retry"
+  | "automation_job_cancel"
+  | "automation_job_rerun"
   | "email_delivery_reconcile";
 
 type ApiErrorPayload = {

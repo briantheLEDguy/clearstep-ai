@@ -230,6 +230,11 @@
   min-width: 150px;
 }
 
+.dangerButton {
+  border-color: #e6b7b2;
+  color: var(--admin-danger);
+}
+
 .profileAvatar,
 .memberAvatar {
   display: grid;
@@ -653,11 +658,25 @@
 
 .scheduleItem {
   display: grid;
+  width: 100%;
   grid-template-columns: 48px minmax(0, 1fr) auto;
   align-items: center;
   gap: 13px;
   padding: 13px 0;
   border-top: 1px solid var(--admin-line);
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.scheduleItem:hover,
+.scheduleItem:focus-visible {
+  background: #f8fbf9;
 }
 
 .dateTile {
@@ -807,11 +826,45 @@
   margin-top: auto;
   padding-top: 16px;
   border-top: 1px solid var(--admin-line);
+  justify-content: space-between;
+}
+
+.coursePrice {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .courseFooter strong {
   font-family: var(--font-manrope), Manrope, Arial, sans-serif;
   font-size: 21px;
+}
+
+.priceEditButton {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--admin-action);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.priceEditor {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--admin-line);
+  border-radius: 9px;
+  background: #fafcfb;
+}
+
+.priceEditor summary {
+  color: var(--admin-action);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .courseFooter span {
@@ -1557,6 +1610,88 @@
   background: #fffbeb;
 }
 
+.dialogBackdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(16, 42, 67, 0.58);
+}
+
+.sessionDialog {
+  width: min(720px, 100%);
+  max-height: min(820px, calc(100vh - 48px));
+  overflow-y: auto;
+  padding: 26px;
+  border: 1px solid var(--admin-line);
+  border-radius: 16px;
+  background: var(--admin-white);
+  box-shadow: 0 24px 80px rgba(16, 42, 67, 0.28);
+}
+
+.dialogHeader,
+.dialogActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.dialogHeader h2 {
+  margin: 0;
+  font-family: var(--font-manrope), Manrope, Arial, sans-serif;
+  font-size: 26px;
+}
+
+.dialogClose {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid var(--admin-line);
+  border-radius: 50%;
+  background: var(--admin-white);
+  color: var(--admin-navy);
+  font: inherit;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.sessionDetails {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.sessionDetails > div {
+  padding: 14px;
+  border: 1px solid var(--admin-line);
+  border-radius: 10px;
+  background: #fafcfb;
+}
+
+.sessionDetails dt {
+  color: var(--admin-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sessionDetails dd {
+  margin: 5px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dialogActions {
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
 .securityNote strong {
   font-size: 12px;
 }
@@ -1697,6 +1832,19 @@
 }
 
 @media (max-width: 650px) {
+  .dialogBackdrop {
+    padding: 10px;
+  }
+
+  .sessionDialog {
+    max-height: calc(100vh - 20px);
+    padding: 20px;
+  }
+
+  .sessionDetails {
+    grid-template-columns: 1fr;
+  }
+
   .profile > span:last-child,
   .adminBrand span,
   .topbar > div:first-child .topbarContext {

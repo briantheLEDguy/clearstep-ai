@@ -24,6 +24,12 @@ const statusByMessage: Record<string, number> = {
   analytics_rate_limited: 429,
   email_sensitive_payload_expired: 410,
   private_quote_checkout_window_too_short: 409,
+  course_not_found: 404,
+  course_stripe_product_required: 409,
+  course_price_changed: 409,
+  automation_job_not_cancellable: 409,
+  automation_job_not_rerunnable: 409,
+  automation_queue_archive_failed: 500,
 };
 
 export async function rpc<T>(
@@ -66,6 +72,12 @@ function humanize(code: string): string {
       "This email action has expired. Create a fresh invitation or offer instead.",
     private_quote_checkout_window_too_short:
       "This quote no longer has enough time to start a secure checkout.",
+    course_not_found: "The course could not be found.",
+    course_stripe_product_required: "Connect a Stripe Product before changing this course price.",
+    course_price_changed: "This course price changed in another request. Refresh and try again.",
+    automation_job_not_cancellable: "Only pending automation jobs can be cancelled.",
+    automation_job_not_rerunnable: "Only terminal non-email jobs can be rerun.",
+    automation_queue_archive_failed: "The queue message could not be archived safely.",
   };
   return known[code] ?? code.replaceAll("_", " ");
 }

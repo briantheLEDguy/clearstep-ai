@@ -2,7 +2,7 @@ import Stripe from "npm:stripe@22.3.2";
 import { withSupabase } from "npm:@supabase/server@1.4.1";
 import { requireUser } from "../_shared/auth.ts";
 import { rpc } from "../_shared/db.ts";
-import { ApiError, env, handleError, methodNotAllowed, ok, readJson } from "../_shared/http.ts";
+import { ApiError, env, handleError, methodNotAllowed, ok, readJson, requireUuid } from "../_shared/http.ts";
 import { validateWorkshopPrice } from "../_shared/stripe.ts";
 
 type AdminRequest = {
@@ -13,6 +13,7 @@ type AdminRequest = {
 const actions = new Set([
   "catalog_list",
   "course_upsert",
+  "course_price_update",
   "session_upsert",
   "private_requests_list",
   "private_request_update",
@@ -32,9 +33,21 @@ const actions = new Set([
   "operations_status",
   "automation_jobs_list",
   "automation_job_retry",
+  "automation_job_cancel",
+  "automation_job_rerun",
   "email_delivery_reconcile",
   "audit_list",
 ]);
+
+type CoursePricingContext = {
+  id: string;
+  slug: string;
+  title: string;
+  price_cents: number;
+  currency: string;
+  stripe_product_id: string | null;
+  stripe_price_id: string | null;
+};
 
 function boundedText(value: unknown, maximum: number) {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= maximum;
@@ -91,6 +104,73 @@ export default {
         throw new ApiError("invalid_request", "payload must be an object.");
       }
       let payload = (body.payload ?? {}) as Record<string, unknown>;
+
+      if (body.action === "course_price_update") {
+        const courseId = requireUuid(payload.course_id, "course_id");
+        const priceCents = Number(payload.price_cents);
+        if (!Number.isInteger(priceCents) || priceCents < 1) {
+          throw new ApiError("course_price_invalid", "The course price must be a positive whole number of cents.");
+        }
+
+        const course = await rpc<CoursePricingContext>(ctx.supabaseAdmin, "get_course_pricing_for_update", {
+          p_actor_user_id: user.id,
+          p_course_id: courseId,
+        });
+        if (!course.stripe_product_id) {
+          throw new ApiError(
+            "course_stripe_product_required",
+            "Connect a Stripe Product and Price before changing this course price.",
+            409,
+          );
+        }
+        if (course.price_cents === priceCents && course.stripe_price_id) {
+          return ok({ course, unchanged: true });
+        }
+
+        const stripe = new Stripe(env("STRIPE_API_KEY"), {
+          apiVersion: "2026-06-24.dahlia",
+        });
+        let stripePrice: Stripe.Price;
+        try {
+          stripePrice = await stripe.prices.create({
+            active: true,
+            currency: "eur",
+            unit_amount: priceCents,
+            product: course.stripe_product_id,
+            tax_behavior: "inclusive",
+            nickname: `${course.slug} · admin price`,
+            metadata: {
+              clearstep_course_id: course.id,
+              clearstep_origin: "staff_workspace",
+            },
+          }, {
+            idempotencyKey: `clearstep-course-price:${course.id}:${course.stripe_price_id ?? "none"}:${priceCents}`,
+          });
+        } catch {
+          throw new ApiError(
+            "stripe_price_create_failed",
+            "Stripe could not create the replacement Price. Check the restricted key's Price permissions.",
+            502,
+          );
+        }
+
+        await validateWorkshopPrice(stripe, {
+          priceId: stripePrice.id,
+          productId: course.stripe_product_id,
+          amountCents: priceCents,
+          currency: "EUR",
+        });
+
+        const result = await rpc(ctx.supabaseAdmin, "update_course_price", {
+          p_actor_user_id: user.id,
+          p_course_id: course.id,
+          p_price_cents: priceCents,
+          p_stripe_price_id: stripePrice.id,
+          p_expected_price_cents: course.price_cents,
+          p_expected_stripe_price_id: course.stripe_price_id,
+        });
+        return ok(result);
+      }
 
       if (body.action === "course_upsert" || body.action === "quote_create") {
         if (body.action === "course_upsert") validateCourseContent(payload);
@@ -167,6 +247,24 @@ export default {
         const result = await rpc(ctx.supabaseAdmin, "retry_non_email_automation_job", {
           p_actor_user_id: user.id,
           p_job_id: payload.job_id,
+        });
+        return ok(result);
+      }
+
+      if (body.action === "automation_job_cancel") {
+        const jobId = requireUuid(payload.job_id, "job_id");
+        const result = await rpc(ctx.supabaseAdmin, "cancel_automation_job", {
+          p_actor_user_id: user.id,
+          p_job_id: jobId,
+        });
+        return ok(result);
+      }
+
+      if (body.action === "automation_job_rerun") {
+        const jobId = requireUuid(payload.job_id, "job_id");
+        const result = await rpc(ctx.supabaseAdmin, "rerun_non_email_automation_job", {
+          p_actor_user_id: user.id,
+          p_job_id: jobId,
         });
         return ok(result);
       }

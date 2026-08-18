@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import AdminNavLink from "@/components/admin/AdminNavLink";
+
 export function SiteHeader() {
   return (
     <header className="site-header shell">
@@ -18,6 +20,7 @@ export function SiteHeader() {
         <Link href="/workshops">Workshops</Link>
         <Link href="/private-workshops">For teams</Link>
         <Link href="/about">About</Link>
+        <AdminNavLink />
         <Link className="nav-sign-in" href="/sign-in">Sign in</Link>
       </nav>
     </header>
