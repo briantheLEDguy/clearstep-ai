@@ -2,7 +2,7 @@
 
 Clearstep AI is a branded, SEO-focused workshop catalogue, booking platform, student account area, and protected staff workspace. Its public message is **“Make AI useful. Keep it simple.”**
 
-This repository is an acceptance-stage implementation. It targets Supabase project `besjkfgfhraibrlaiejk` and the Sites project recorded in `.openai/hosting.json`. On 2026-08-18, all seven reviewed migrations and twelve Edge Functions were deployed to that Supabase project, and an owner-only Sites acceptance version was deployed. The production Auth Site URL and exact callback allowlist now use `https://www.clearstep-ai.nl`. The seed remains deliberately draft and unsellable. Provider credentials, worker invocation, custom-domain validation, and public launch remain gated.
+This repository is an acceptance-stage implementation. It targets Supabase project `besjkfgfhraibrlaiejk` and the Sites project recorded in `.openai/hosting.json`. On 2026-08-18, all seven reviewed migrations and twelve Edge Functions were deployed to that Supabase project, and an owner-only Sites acceptance version was deployed. The production Auth Site URL and exact callback allowlist now use `https://www.clearstep-ai.nl`, and the attached hostname has active routing and SSL. The Stripe sandbox has a rotated server key, three matching draft Product/Price pairs, and a signed webhook that passed a non-payment health probe. The seed remains deliberately draft and unsellable. Stripe account activation, provider acceptance, worker invocation, and public launch remain gated.
 
 ## Architecture
 
@@ -115,12 +115,12 @@ Configure the student Google provider with the Supabase Auth callback for projec
 
 ## Sites acceptance release
 
-The Sites project identifier is stored in `.openai/hosting.json`; the intended slug is `clearstep-ai`. The current deployment is owner-only. The custom hostname `www.clearstep-ai.nl` is attached and must reach active domain and SSL status before public release. Build and deploy only the exact reviewed commit with `NEXT_PUBLIC_SITE_URL=https://www.clearstep-ai.nl`.
+The Sites project identifier is stored in `.openai/hosting.json`; the intended slug is `clearstep-ai`. The current deployment is owner-only. The custom hostname `www.clearstep-ai.nl` has active routing and SSL. Build and deploy only the exact reviewed commit with `NEXT_PUBLIC_SITE_URL=https://www.clearstep-ai.nl`.
 
 Do not publish publicly until all of these gates are complete:
 
 - Configure remote secrets, install the worker invocation cron, and execute database/provider integration tests. Supabase advisors were run after migration; only intentional private-table/RPC notices and fresh-database unused-index notices remained.
-- Configure Stripe test and live restricted keys, Product/Price IDs, webhook events (including `charge.refunded`), cards/iDEAL, invoices, VAT/tax behavior, and refund operations.
+- Complete the Stripe sandbox business requirements and terms so payments become enabled; then verify cards/iDEAL, invoices, VAT/tax behavior, refunds, and the separate live-mode key, webhook, and Product/Price set.
 - Configure separate student and Workspace OAuth clients, connect Brian’s Workspace account, create the dedicated calendar, and test Gmail/Calendar failures and uncertain-email reconciliation.
 - Configure the student Google provider, standard email bootstrap, and the Auth Send Email Hook; then verify both production Auth callback paths end to end.
 - Complete provider-backed competition, expiry, duplicate/out-of-order webhook, refund, RLS, invitation, rate-limit, retention, and integration-health tests.

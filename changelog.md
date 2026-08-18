@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-08-18 — Domain validation and Stripe sandbox wiring
+
+### Completed
+
+- Confirmed active routing and SSL for `www.clearstep-ai.nl` while preserving owner-only site access.
+- Rotated and deployed the Stripe sandbox server key without storing it in the repository.
+- Created three active, VAT-inclusive, one-time EUR sandbox Prices and linked them to the matching draft courses without publishing sales.
+- Added the signed Supabase webhook endpoint for the five required Checkout/refund events and stored its signing secret in Supabase.
+- Sent a synthetic signed, non-payment delivery probe; Supabase verified the signature, processed the event safely, and reported healthy webhook integration status.
+
+### Still gated
+
+- Stripe reports payments disabled until the sandbox business profile requirements and terms are completed.
+- Real card/iDEAL checkout, invoice, asynchronous-payment, refund, and duplicate/out-of-order webhook acceptance remain outstanding.
+- The Sites deployment remains owner-only pending the other provider, legal, tax, asset, and acceptance gates.
+
 ## 2026-08-18 — Custom-domain preparation
 
 ### Changed
@@ -9,9 +25,9 @@
 - Added the matching `PUBLIC_SITE_URL` Edge Function secret without exposing provider credentials.
 - Tightened rendered-page and search-discovery tests to require the custom-domain origin.
 
-### Still gated
+### Follow-up
 
-- Sites DNS and SSL validation must become active before the custom hostname is used for acceptance testing.
+- Sites DNS and SSL validation subsequently became active.
 - The Supabase dashboard initially returned a server error while saving the redirect allowlist, but a fresh read confirmed that the exact `https://www.clearstep-ai.nl/auth/callback` entry persisted successfully.
 
 ## 2026-08-18 — Acceptance implementation
