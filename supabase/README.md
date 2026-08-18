@@ -1,6 +1,6 @@
 # Clearstep Supabase backend
 
-This directory contains the database, Auth integration points, Edge Functions, Stripe workflow, Google Workspace automation, staff authorization, and first-party analytics for Clearstep. The remote project is `besjkfgfhraibrlaiejk` (**Clearstep** in the **AI-workshop** organization). All seven migrations and twelve Edge Functions were applied/deployed there on 2026-08-18 and verified active. Provider secrets and OAuth/payment connections are not yet live; verify the selected project before every future migration, secret, function, or cron operation.
+This directory contains the database, Auth integration points, Edge Functions, Stripe workflow, Google Workspace automation, staff authorization, and first-party analytics for Clearstep. The remote project is `besjkfgfhraibrlaiejk` (**Clearstep** in the **AI-workshop** organization). The original seven migrations and twelve Edge Functions were applied/deployed there on 2026-08-18 and verified active; `20260818200414_admin_controls.sql` and its updated `admin-catalog` function must be deployed with the matching frontend release. Provider secrets and OAuth/payment connections are not yet live; verify the selected project before every future migration, secret, function, or cron operation.
 
 ## Data and authorization boundaries
 
@@ -27,6 +27,7 @@ Apply exactly in lexical order:
 5. `20260818130300_booking_maintenance_cron.sql` — minute booking maintenance
 6. `20260818130400_seed_clearstep_catalog.sql` — fixed catalogue/session seed with Stripe IDs intentionally `null`
 7. `20260818130500_runtime_security_hardening.sql` — Vault tokens, analytics throttle, Stripe failure attempts, Gmail send intent, Calendar leases/refund removal, quote expiry, sensitive-payload cleanup
+8. `20260818200414_admin_controls.sql` — audited course price replacement and owner-only automation cancellation/reruns
 
 Migration seven intentionally invalidates any legacy app-encrypted Google connection; the owner must authorize Workspace again so fresh access and refresh tokens are created directly in Supabase Vault.
 
@@ -75,7 +76,7 @@ The Edge runtime supplies `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SER
 
 ## Production setup order
 
-1. Verify project reference `besjkfgfhraibrlaiejk`; review and apply the seven migrations in order with PGMQ, `pg_cron`, Vault, and `pg_net` available.
+1. Verify project reference `besjkfgfhraibrlaiejk`; review and apply the eight migrations in order with PGMQ, `pg_cron`, Vault, and `pg_net` available.
 2. Deploy all functions with the JWT modes in `config.toml`; set the secret names above.
 3. Configure production Supabase Auth URLs and bootstrap Brian’s verified owner before enabling the custom email hook.
 4. Configure Stripe test Products/Prices and the signed webhook; keep live IDs unset until payment/tax acceptance passes.
@@ -106,7 +107,7 @@ Configure these webhook events:
 - `checkout.session.expired`
 - `charge.refunded`
 
-The restricted key needs read Products/Prices, create/retrieve/expire Checkout Sessions, and permissions needed by invoices/receipts. Webhook enrollment is authoritative. Duplicate/out-of-order events are idempotent. A verified processing exception is recorded in `private.stripe_webhook_failures` without consuming the event ID needed for Stripe retry. Unsettled asynchronous payments time out after their grace deadline, cancel the provisional enrollment, release the hold/offer, and queue customer/owner notices; any later paid event still runs final allocation/remediation. Late/post-cutoff payments that cannot receive a seat remain refund-remediation records and degrade health; they are not silently acknowledged as healthy.
+The restricted key needs read Products/Prices, create Prices, create/retrieve/expire Checkout Sessions, and permissions needed by invoices/receipts. Admin amount changes create a replacement one-time EUR Price on the existing Product and validate its amount, active state, Product, and inclusive tax behavior before the course record changes; existing purchases are untouched. Webhook enrollment is authoritative. Duplicate/out-of-order events are idempotent. A verified processing exception is recorded in `private.stripe_webhook_failures` without consuming the event ID needed for Stripe retry. Unsettled asynchronous payments time out after their grace deadline, cancel the provisional enrollment, release the hold/offer, and queue customer/owner notices; any later paid event still runs final allocation/remediation. Late/post-cutoff payments that cannot receive a seat remain refund-remediation records and degrade health; they are not silently acknowledged as healthy.
 
 ## Google and automation invariants
 
@@ -115,6 +116,8 @@ Create a dedicated **Clearstep Workshops** calendar and set `GOOGLE_CALENDAR_ID`
 Public/private sessions must have a Calendar event before sale. Online/hybrid sessions become ready only after Google Meet supplies a URL; pending/absent conference creation is polled with a request ID derived from the current session revision. That ID is stable across retries of one transition and changes after a later in-person-to-online transition. A provider-declared creation failure derives the next stable recovery ID from the failed request fingerprint. A per-session lease serializes writes, and the worker resolves the current course/session fields at execution instead of trusting historical job payloads. Moving a session to in-person explicitly clears Google conference data and writes a `null` Meet URL without coalescing the old value. Full refunds enqueue `calendar_enrollment_remove`, which filters only the refunded attendee under an ETag and is idempotent; partial refunds do not enqueue removal. A stale add checks the enrollment is still confirmed.
 
 PGMQ is the transport; `private.automation_jobs` stores dedupe/status/attempt metadata. Gmail has no request idempotency key, so email work records a durable intent before send and a deterministic RFC Message-ID. Explicit 401 rejection refreshes the token and retries once; rejected 429/5xx requests use queue backoff. Any ambiguous transport/post-send interruption becomes terminal `uncertain`, preventing automatic duplicates. The owner queue view requires a deliberate, audited choice after checking Gmail: confirm the message was sent or retry only after verifying it was not sent. Completed/cancelled delivery payloads redact invitation, waitlist, and quote action data immediately. Failed/uncertain payloads remain only for recovery and are redacted when their action expires or after at most 31 days.
+
+Owners may cancel only jobs that are still pending; the queue message is archived before the database job becomes `cancelled`. Failed, completed, or cancelled non-email jobs may be rerun from the beginning with a fresh queue message. Processing jobs cannot be cancelled, and completed/cancelled email jobs cannot be rerun, because either action could duplicate an external side effect.
 
 Scheduled work:
 

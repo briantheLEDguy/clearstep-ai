@@ -34,6 +34,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import styles from "@/app/admin/admin.module.css";
 
 type Viewer = { id: string; email: string };
+type SessionWithCourse = SessionRecord & { courseTitle: string };
 type SectionKey = "catalog" | "bookings" | "waitlist" | "private" | "analytics" | "team" | "audit" | "integrations" | "automation";
 
 type DashboardData = {
@@ -158,6 +159,7 @@ export default function AdminDashboard({ viewer }: { viewer: Viewer }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [selectedSession, setSelectedSession] = useState<SessionWithCourse | null>(null);
 
   const refresh = useCallback(async (quiet = false) => {
     if (!client) return;
@@ -394,14 +396,14 @@ export default function AdminDashboard({ viewer }: { viewer: Viewer }) {
                   {upcoming.length ? (
                     <div className={styles.scheduleList}>
                       {upcoming.slice(0, 4).map((session) => (
-                        <article className={styles.scheduleItem} key={session.id}>
+                        <button className={styles.scheduleItem} key={session.id} type="button" onClick={() => setSelectedSession(session)} aria-label={`View and edit ${session.courseTitle} on ${dateTime(session.start_at)}`}>
                           <time dateTime={session.start_at} className={styles.dateTile}>
                             <strong>{new Date(session.start_at).toLocaleDateString("en-NL", { day: "numeric", timeZone: "Europe/Amsterdam" })}</strong>
                             <span>{new Date(session.start_at).toLocaleDateString("en-NL", { month: "short", timeZone: "Europe/Amsterdam" })}</span>
                           </time>
                           <div className={styles.scheduleCopy}><strong>{session.courseTitle}</strong><span>{session.venue || "Online"} · {dateTime(session.start_at)}</span></div>
                           <div className={styles.scheduleCapacity}><strong>{session.capacity}</strong><span>places</span></div>
-                        </article>
+                        </button>
                       ))}
                     </div>
                   ) : <EmptyState title="No upcoming sessions" description="Create a draft session when the next date is ready." />}
@@ -424,6 +426,7 @@ export default function AdminDashboard({ viewer }: { viewer: Viewer }) {
               error={errors.catalog}
               busy={busy}
               onMutate={mutate}
+              onEditSession={setSelectedSession}
             />
           ) : null}
 
@@ -460,6 +463,21 @@ export default function AdminDashboard({ viewer }: { viewer: Viewer }) {
           ) : null}
           {isOwner ? (
             <AutomationSection jobs={data.automationJobs} counts={data.automationCounts} failedEmailDeliveries={data.failedEmailDeliveries} error={errors.automation} busy={busy} onMutate={mutate} />
+          ) : null}
+
+          {selectedSession ? (
+            <SessionDialog
+              key={selectedSession.id}
+              session={selectedSession}
+              courses={data.courses}
+              busy={busy === `session-edit-${selectedSession.id}`}
+              onClose={() => setSelectedSession(null)}
+              onSave={async (payload) => {
+                const saved = await mutate(`session-edit-${selectedSession.id}`, "session_upsert", payload, "Session updated.");
+                if (saved) setSelectedSession(null);
+                return saved;
+              }}
+            />
           ) : null}
 
           <footer className={styles.adminFooter}>
@@ -511,7 +529,7 @@ function Attention({ href, label, value, tone }: { href: string; label: string; 
 
 type Mutate = (operation: string, action: AdminAction, payload: Record<string, unknown>, success: string) => Promise<boolean>;
 
-function CatalogSection({ courses, error, busy, onMutate }: { courses: CourseRecord[]; error?: string; busy: string | null; onMutate: Mutate }) {
+function CatalogSection({ courses, error, busy, onMutate, onEditSession }: { courses: CourseRecord[]; error?: string; busy: string | null; onMutate: Mutate; onEditSession: (session: SessionWithCourse) => void }) {
   const sessions = courses.flatMap((course) => course.sessions.map((session) => ({ ...session, courseTitle: course.title })));
   return (
     <section className={styles.section} id="courses">
@@ -528,7 +546,24 @@ function CatalogSection({ courses, error, busy, onMutate }: { courses: CourseRec
               <div className={styles.courseNumber} aria-hidden="true">{String(index + 1).padStart(2, "0")}</div>
               <StatusBadge status={statusFor(course.status)} />
               <h3>{course.title}</h3><p>{course.summary}</p>
-              <div className={styles.courseFooter}><strong>{money(course.price_cents, course.currency)}</strong><span>{course.duration_minutes} minutes</span></div>
+              <div className={styles.courseFooter}><span className={styles.coursePrice}><strong>{money(course.price_cents, course.currency)}</strong><button className={styles.priceEditButton} type="button" onClick={(event) => { const editor = event.currentTarget.closest(`.${styles.courseCard}`)?.querySelector<HTMLDetailsElement>(`details[data-price-editor]`); if (editor) { editor.open = true; editor.scrollIntoView({ block: "nearest" }); } }}>Edit price</button></span><span>{course.duration_minutes} minutes</span></div>
+              <CoursePriceEditor
+                course={course}
+                busy={busy === `course-price-${course.id}`}
+                onSave={(priceCents) => course.stripe_product_id
+                  ? onMutate(
+                    `course-price-${course.id}`,
+                    "course_price_update",
+                    { course_id: course.id, price_cents: priceCents },
+                    `Price updated for ${course.title}.`,
+                  )
+                  : onMutate(
+                    `course-price-${course.id}`,
+                    "course_upsert",
+                    coursePayload({ ...course, price_cents: priceCents }, course.status),
+                    `Draft price updated for ${course.title}.`,
+                  )}
+              />
               <CoursePaymentForm
                 course={course}
                 busy={busy === `course-payment-${course.id}`}
@@ -553,12 +588,78 @@ function CatalogSection({ courses, error, busy, onMutate }: { courses: CourseRec
       <Panel className={styles.tablePanel}>
         <div className={styles.panelHeaderWithAction}><div><p className={styles.panelKicker}>Schedule</p><h3>All sessions</h3></div></div>
         {sessions.length ? (
-          <div className={styles.tableWrap}><table className={styles.table}><caption className={styles.srOnly}>Workshop sessions</caption><thead><tr><th>Date</th><th>Workshop</th><th>Format</th><th>Capacity</th><th>Status</th><th>Change</th></tr></thead><tbody>
-            {sessions.map((session) => <tr key={session.id}><td>{dateTime(session.start_at)}</td><td><strong>{session.courseTitle}</strong><small>{session.venue || "Online"}</small></td><td>{session.format.replaceAll("_", " ")}</td><td>{session.capacity}</td><td><StatusBadge status={statusFor(session.status)} /></td><td><InlineSelect compact label={`Change session status for ${session.courseTitle}`} value={session.status} options={["draft", "scheduled", "sold_out", "cancelled", "completed"]} busy={busy === `session-${session.id}`} onSave={(status) => onMutate(`session-${session.id}`, "session_upsert", sessionPayload(session, status), "Session status updated.")} /></td></tr>)}
+          <div className={styles.tableWrap}><table className={styles.table}><caption className={styles.srOnly}>Workshop sessions</caption><thead><tr><th>Date</th><th>Workshop</th><th>Format</th><th>Capacity</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+            {sessions.map((session) => <tr id={`session-${session.id}`} key={session.id}><td>{dateTime(session.start_at)}</td><td><strong>{session.courseTitle}</strong><small>{session.venue || "Online"}</small></td><td>{session.format.replaceAll("_", " ")}</td><td>{session.capacity}</td><td><StatusBadge status={statusFor(session.status)} /></td><td><div className={styles.tableActions}><button className={styles.tableButton} type="button" onClick={() => onEditSession(session)}>View / edit</button><InlineSelect compact label={`Change session status for ${session.courseTitle}`} value={session.status} options={["draft", "scheduled", "sold_out", "cancelled", "completed"]} busy={busy === `session-${session.id}`} onSave={(status) => onMutate(`session-${session.id}`, "session_upsert", sessionPayload(session, status), "Session status updated.")} /></div></td></tr>)}
           </tbody></table></div>
         ) : <EmptyState title="No sessions yet" description="Add a draft session when a workshop date is ready." />}
       </Panel>
     </section>
+  );
+}
+
+function SessionDialog({ session, courses, busy, onClose, onSave }: { session: SessionWithCourse; courses: CourseRecord[]; busy: boolean; onClose: () => void; onSave: (payload: Record<string, unknown>) => Promise<boolean> }) {
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !busy) onClose();
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [busy, onClose]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    await onSave({
+      id: session.id,
+      course_id: String(values.get("course_id")),
+      format: String(values.get("format")),
+      start_at: amsterdamLocalToIso(String(values.get("start_at"))),
+      end_at: amsterdamLocalToIso(String(values.get("end_at"))),
+      timezone: "Europe/Amsterdam",
+      venue: String(values.get("venue") ?? "").trim(),
+      capacity: Number(values.get("capacity")),
+      status: String(values.get("status")),
+    });
+  }
+
+  return (
+    <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
+      <section className={styles.sessionDialog} role="dialog" aria-modal="true" aria-labelledby="session-dialog-title">
+        <div className={styles.dialogHeader}>
+          <div><p className={styles.panelKicker}>Workshop event</p><h2 id="session-dialog-title">{session.courseTitle}</h2></div>
+          <button className={styles.dialogClose} type="button" disabled={busy} onClick={onClose} aria-label="Close event details">×</button>
+        </div>
+        {!editing ? (
+          <>
+            <dl className={styles.sessionDetails}>
+              <div><dt>Starts</dt><dd>{dateTime(session.start_at)}</dd></div>
+              <div><dt>Ends</dt><dd>{dateTime(session.end_at)}</dd></div>
+              <div><dt>Format</dt><dd>{statusFor(session.format).label}</dd></div>
+              <div><dt>Venue</dt><dd>{session.venue || "Online"}</dd></div>
+              <div><dt>Capacity</dt><dd>{session.capacity} places</dd></div>
+              <div><dt>Status</dt><dd><StatusBadge status={statusFor(session.status)} /></dd></div>
+            </dl>
+            <div className={styles.dialogActions}><button className={styles.secondaryButton} type="button" onClick={onClose}>Close</button><button className={styles.primaryButton} type="button" onClick={() => setEditing(true)}>Edit event</button></div>
+          </>
+        ) : (
+          <form className={styles.adminForm} onSubmit={(event) => void submit(event)}>
+            <div className={styles.formGrid}>
+              <label>Course<select name="course_id" required defaultValue={session.course_id}>{courses.map((course) => <option key={course.id} value={course.id}>{course.title}</option>)}</select></label>
+              <label>Format<select name="format" defaultValue={session.format}><option value="in_person">In person</option><option value="online">Online</option><option value="hybrid">Hybrid</option></select></label>
+              <label>Starts (Amsterdam)<input name="start_at" type="datetime-local" required defaultValue={toAmsterdamLocalInput(session.start_at)} /></label>
+              <label>Ends (Amsterdam)<input name="end_at" type="datetime-local" required defaultValue={toAmsterdamLocalInput(session.end_at)} /></label>
+              <label>Venue<input name="venue" defaultValue={session.venue ?? ""} placeholder="Leave blank for online" /></label>
+              <label>Capacity<input name="capacity" type="number" min="1" max="500" required defaultValue={session.capacity} /></label>
+              <label>Status<select name="status" defaultValue={session.status}>{["draft", "scheduled", "sold_out", "cancelled", "completed"].map((status) => <option key={status} value={status}>{statusFor(status).label}</option>)}</select></label>
+            </div>
+            <p className={styles.formNote}>Sessions with occupied or paid booking history keep their date, format, venue, course and status locked; capacity can only increase above occupied seats.</p>
+            <div className={styles.dialogActions}><button className={styles.secondaryButton} type="button" disabled={busy} onClick={() => setEditing(false)}>Cancel edit</button><button className={styles.primaryButton} type="submit" disabled={busy}>{busy ? "Saving…" : "Save changes"}</button></div>
+          </form>
+        )}
+      </section>
+    </div>
   );
 }
 
@@ -601,6 +702,26 @@ function CoursePaymentForm({ course, busy, onSave }: { course: CourseRecord; bus
   }
 
   return <details className={styles.quoteForm}><summary>Stripe pricing</summary><form className={styles.adminForm} onSubmit={(event) => void submit(event)}><label>Product ID<input name="stripe_product_id" required pattern="prod_[A-Za-z0-9]+" defaultValue={course.stripe_product_id ?? ""} /></label><label>Price ID<input name="stripe_price_id" required pattern="price_[A-Za-z0-9]+" defaultValue={course.stripe_price_id ?? ""} /></label><button className={styles.primaryButton} type="submit" disabled={busy}>{busy ? "Verifying…" : "Verify and save"}</button><p className={styles.formNote}>The server verifies the active EUR Price matches {money(course.price_cents, course.currency)} before saving.</p></form></details>;
+}
+
+function CoursePriceEditor({ course, busy, onSave }: { course: CourseRecord; busy: boolean; onSave: (priceCents: number) => Promise<boolean> }) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const euros = Number(new FormData(event.currentTarget).get("price_euros"));
+    if (!Number.isFinite(euros)) return;
+    await onSave(Math.round(euros * 100));
+  }
+
+  return (
+    <details className={styles.priceEditor} data-price-editor>
+      <summary>Adjust course price</summary>
+      <form className={styles.adminForm} onSubmit={(event) => void submit(event)}>
+        <label>Price per person (EUR)<input name="price_euros" type="number" min="0.01" step="0.01" required defaultValue={(course.price_cents / 100).toFixed(2)} /></label>
+        <button className={styles.primaryButton} type="submit" disabled={busy}>{busy ? "Updating…" : "Update price"}</button>
+        <p className={styles.formNote}>{course.stripe_product_id ? "A new immutable, VAT-inclusive Stripe Price will be created for future checkouts. Existing payments are unchanged." : "This draft has no Stripe Product yet, so only the catalogue amount will change."}</p>
+      </form>
+    </details>
+  );
 }
 
 function SessionCreateForm({ courses, busy, onSubmit }: { courses: CourseRecord[]; busy: boolean; onSubmit: (payload: Record<string, unknown>) => Promise<boolean> }) {
@@ -737,11 +858,17 @@ function AutomationSection({ jobs, counts, failedEmailDeliveries, error, busy, o
 }
 
 function AutomationJobAction({ job, busy, onMutate }: { job: AutomationJobRecord; busy: string | null; onMutate: Mutate }) {
-  if (job.status !== "failed") return <>—</>;
-  if (job.job_type !== "email") {
-    const busyKey = `job-${job.id}`;
-    return <button className={styles.tableButton} type="button" disabled={busy === busyKey} onClick={() => void onMutate(busyKey, "automation_job_retry", { job_id: job.id }, "Automation job queued for retry.")}>{busy === busyKey ? "Retrying…" : "Retry safely"}</button>;
+  if (job.status === "pending") {
+    const busyKey = `job-cancel-${job.id}`;
+    return <button className={`${styles.tableButton} ${styles.dangerButton}`} type="button" disabled={busy === busyKey} onClick={() => { if (window.confirm(`Cancel this pending ${job.job_type.replaceAll("_", " ")} job?`)) void onMutate(busyKey, "automation_job_cancel", { job_id: job.id }, "Automation job cancelled."); }}>{busy === busyKey ? "Cancelling…" : "Cancel"}</button>;
   }
+
+  if (job.job_type !== "email" && ["failed", "completed", "cancelled"].includes(job.status)) {
+    const busyKey = `job-rerun-${job.id}`;
+    return <button className={styles.tableButton} type="button" disabled={busy === busyKey} onClick={() => { if (window.confirm(`Rerun this ${job.job_type.replaceAll("_", " ")} job from the beginning?`)) void onMutate(busyKey, "automation_job_rerun", { job_id: job.id }, "Automation job queued to rerun."); }}>{busy === busyKey ? "Queueing…" : "Rerun"}</button>;
+  }
+
+  if (job.status !== "failed") return <>—</>;
 
   const canConfirmSent = job.email_delivery_status === "uncertain";
   const canRetryUnsent = canConfirmSent || job.email_delivery_status === "failed";
@@ -765,6 +892,22 @@ function amsterdamLocalToIso(value: string) {
   const adjustedOffset = amsterdamOffset(new Date(instant));
   if (adjustedOffset !== offset) { offset = adjustedOffset; instant = localAsUtc - offset; }
   return new Date(instant).toISOString();
+}
+
+function toAmsterdamLocalInput(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Amsterdam",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
 }
 
 function amsterdamOffset(date: Date) {

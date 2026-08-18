@@ -6,6 +6,8 @@ const dashboardUrl = new URL("../components/admin/AdminDashboard.tsx", import.me
 const gateUrl = new URL("../components/admin/AdminGate.tsx", import.meta.url);
 const apiUrl = new URL("../lib/admin/admin-api.ts", import.meta.url);
 const adminFunctionUrl = new URL("../supabase/functions/admin-catalog/index.ts", import.meta.url);
+const adminNavUrl = new URL("../components/admin/AdminNavLink.tsx", import.meta.url);
+const adminControlsMigrationUrl = new URL("../supabase/migrations/20260818200414_admin_controls.sql", import.meta.url);
 
 test("staff workspace is gated by a verified Supabase user and server-side membership action", async () => {
   const gate = await readFile(gateUrl, "utf8");
@@ -65,7 +67,9 @@ test("staff mutations use the exact role-checked contracts", async () => {
     "waitlist_remove",
     "staff_update",
     "staff_invite_revoke",
-    "automation_job_retry",
+    "course_price_update",
+    "automation_job_cancel",
+    "automation_job_rerun",
   ]) {
     assert.match(dashboard, new RegExp(`"${action}"`), action);
   }
@@ -76,6 +80,52 @@ test("staff mutations use the exact role-checked contracts", async () => {
   assert.match(dashboard, /\{ invite_id: invite\.id \}/);
   assert.match(dashboard, /data\.role === "owner" \|\| data\.role === "admin"/);
   assert.match(dashboard, /data\.role === "owner"/);
+});
+
+test("signed-in owners and admins receive a verified public-site Admin menu link", async () => {
+  const nav = await readFile(adminNavUrl, "utf8");
+
+  assert.match(nav, /supabase\.auth\.getUser\(\)/u);
+  assert.match(nav, /invokeAdmin<StaffContext>\(supabase, "staff_context"\)/u);
+  assert.match(nav, /context\?\.role === "owner" \|\| context\?\.role === "admin"/u);
+  assert.match(nav, /href="\/admin"/u);
+  assert.doesNotMatch(nav, /user_metadata|service_role|SUPABASE_SERVICE/u);
+});
+
+test("course prices, schedule details, and queue controls use protected admin contracts", async () => {
+  const [dashboard, adminFunction, migration] = await Promise.all([
+    readFile(dashboardUrl, "utf8"),
+    readFile(adminFunctionUrl, "utf8"),
+    readFile(adminControlsMigrationUrl, "utf8"),
+  ]);
+
+  assert.match(dashboard, />Edit price<|>Edit price<\/button>/u);
+  assert.match(dashboard, /"course_price_update"/u);
+  assert.match(dashboard, /<SessionDialog/u);
+  assert.match(dashboard, />Edit event<\/button>/u);
+  assert.match(dashboard, /"automation_job_cancel"/u);
+  assert.match(dashboard, /"automation_job_rerun"/u);
+  assert.match(dashboard, /job\.job_type !== "email"/u);
+
+  assert.match(adminFunction, /stripe\.prices\.create\(/u);
+  assert.match(adminFunction, /tax_behavior: "inclusive"/u);
+  assert.match(adminFunction, /idempotencyKey: `clearstep-course-price:/u);
+  assert.match(adminFunction, /"update_course_price"/u);
+  assert.match(adminFunction, /"cancel_automation_job"/u);
+  assert.match(adminFunction, /"rerun_non_email_automation_job"/u);
+
+  for (const functionName of [
+    "get_course_pricing_for_update",
+    "update_course_price",
+    "cancel_automation_job",
+    "rerun_non_email_automation_job",
+  ]) {
+    assert.match(migration, new RegExp(`function public\\.${functionName}`, "u"));
+    assert.match(migration, new RegExp(`revoke execute on function public\\.${functionName}`, "u"));
+  }
+  assert.match(migration, /status = 'pending'[\s\S]*pgmq\.archive/u);
+  assert.match(migration, /status in \('failed', 'completed', 'cancelled'\)[\s\S]*job_type <> 'email'/u);
+  assert.match(migration, /course\.price_updated/u);
 });
 
 test("course editing enforces the public catalog content bounds at every request", async () => {

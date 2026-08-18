@@ -9,7 +9,7 @@ const read = async (relative) =>
   (await readFile(path.join(root, relative), "utf8")).replaceAll("\r\n", "\n");
 const projectRoot = path.resolve(root, "..");
 
-test("runtime hardening is isolated in the final migration", async () => {
+test("runtime hardening and later admin controls have ordered migrations", async () => {
   const migrations = (await readdir(path.join(root, "migrations"))).sort();
   assert.deepEqual(migrations, [
     "20260818130000_clearstep_core.sql",
@@ -19,6 +19,7 @@ test("runtime hardening is isolated in the final migration", async () => {
     "20260818130300_booking_maintenance_cron.sql",
     "20260818130400_seed_clearstep_catalog.sql",
     "20260818130500_runtime_security_hardening.sql",
+    "20260818200414_admin_controls.sql",
   ]);
 });
 

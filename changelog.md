@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-08-18 — Admin workspace controls
+
+### Added
+
+- Added role-verified **Admin** navigation for signed-in owners and administrators.
+- Added schedule event detail dialogs with full session editing from the overview and session table.
+- Added audited course price editing that creates and validates a replacement immutable Stripe Price for future checkouts.
+- Added owner-only automation cancellation for pending jobs and reruns for terminal non-email jobs, while preserving verified-unsent reconciliation for email.
+
+### Security
+
+- Kept every new privileged operation behind the existing Edge Function and service-only database authorization boundaries.
+- Archived queue messages before cancellation and continued blocking unsafe completed-email reruns that could duplicate delivery.
+
 ## 2026-08-18 — Public-site visual scale and contrast
 
 ### Changed

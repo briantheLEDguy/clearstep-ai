@@ -49,6 +49,8 @@ Checkout requires Supabase Auth with email magic links or student Google login. 
 
 `brian@bncconsulting.co` is the verified bootstrap owner. Other staff enter through a seven-day, single-use invitation accepted while signed in with the invited verified email. Only a token hash is stored in the invitation record. Raw delivery links are removed from completed automation payloads and have expiry-based/31-day fallback redaction.
 
+Signed-in owners and admins receive an **Admin** link in the public site navigation. The staff workspace supports audited price replacement through Stripe, full session detail/edit controls from the overview schedule, and owner-only cancellation of pending automation jobs or reruns of terminal non-email jobs. Email reruns remain restricted to the verified-unsent reconciliation flow to prevent duplicate messages.
+
 ## Local setup
 
 Use Node.js `>=22.13.0`.
@@ -93,9 +95,11 @@ The Edge runtime provides `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SER
 
 ## Supabase and provider operations
 
-Review and apply the seven migrations in lexical order, deploy the twelve functions with `supabase/config.toml`, and set runtime secrets only in the verified `besjkfgfhraibrlaiejk` project. The final hardening migration moves Workspace OAuth tokens to Supabase Vault, adds the public analytics throttle, protects Gmail delivery intents, serializes Calendar work per session, caps quote checkout, and redacts sensitive delivery payloads. See `supabase/README.md` for the exact inventory and runbook.
+Review and apply the eight migrations in lexical order, deploy the twelve functions with `supabase/config.toml`, and set runtime secrets only in the verified `besjkfgfhraibrlaiejk` project. The runtime hardening migration moves Workspace OAuth tokens to Supabase Vault, adds the public analytics throttle, protects Gmail delivery intents, serializes Calendar work per session, caps quote checkout, and redacts sensitive delivery payloads. The later admin-controls migration adds service-only price and queue operations. See `supabase/README.md` for the exact inventory and runbook.
 
 Stripe Checkout uses stored VAT-inclusive EUR Prices, invoices, dynamic payment methods, and a verified raw-body webhook. The browser never supplies an amount. A Checkout Session must fit Stripe’s minimum window and may not outlive its database hold, private-quote deadline, or workshop start. Enrollment is webhook-owned; success-page visits are read-only. Unsettled asynchronous payments time out after their authoritative grace window, release the provisional seat, and alert the customer and Brian. A later paid event still enters final capacity/post-start checks. Late payments that cannot be allocated are persisted as refund remediation and keep integration health degraded until resolved.
+
+Admin price edits create a new immutable, VAT-inclusive one-time EUR Price on the course’s existing Stripe Product, validate it server-side, and then update the authoritative course record. Existing Checkout Sessions and payments keep their original amount. The restricted Stripe key therefore also needs permission to create Prices.
 
 Workspace automation uses a dedicated **Clearstep Workshops** calendar. Sessions are provisioned before sale; online/hybrid sessions are not ready until Meet creation returns a URL. Per-session leases serialize attendee changes, every job rebuilds mutable event fields from current database state, and each online transition derives a new Meet request ID from the session revision while retries of that transition reuse it. If Google marks creation as failed, the provider request fingerprint derives the next stable recovery ID. A change to in-person explicitly clears conference data and the stored Meet URL. Full refunds remove only the refunded attendee, while stale add jobs check current enrollment status. Gmail outbox delivery uses a durable send intent and deterministic RFC Message-ID. Explicit 401 responses refresh authorization and retry once; rejected 429/5xx requests use queue backoff. An ambiguous transport/post-send failure is marked `uncertain` instead of being automatically resent, and the owner must check Gmail before confirming delivery or explicitly retrying a verified-unsent message.
 
