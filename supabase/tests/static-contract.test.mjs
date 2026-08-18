@@ -5,7 +5,8 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const read = (relative) => readFile(path.join(root, relative), "utf8");
+const read = async (relative) =>
+  (await readFile(path.join(root, relative), "utf8")).replaceAll("\r\n", "\n");
 const projectRoot = path.resolve(root, "..");
 
 test("runtime hardening is isolated in the final migration", async () => {

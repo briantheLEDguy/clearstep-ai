@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-18 — Local workspace portability
+
+### Fixed
+
+- Normalized CRLF line endings in the Supabase static-contract test reader so the full safety suite behaves consistently in Windows and Linux checkouts.
+
 ## 2026-08-18 — Domain validation and Stripe sandbox wiring
 
 ### Completed
