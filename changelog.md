@@ -9,11 +9,13 @@
 - Created three active, VAT-inclusive, one-time EUR sandbox Prices and linked them to the matching draft courses without publishing sales.
 - Added the signed Supabase webhook endpoint for the five required Checkout/refund events and stored its signing secret in Supabase.
 - Sent a synthetic signed, non-payment delivery probe; Supabase verified the signature, processed the event safely, and reported healthy webhook integration status.
+- Stored the exact secondary `Clearstep Workshops` calendar ID, Workspace identity/domain, OAuth callback, owner notification address, analytics abuse salt, and disabled automatic-tax flag in Supabase.
 
 ### Still gated
 
 - Stripe reports payments disabled until the sandbox business profile requirements and terms are completed.
 - Real card/iDEAL checkout, invoice, asynchronous-payment, refund, and duplicate/out-of-order webhook acceptance remain outstanding.
+- The Google Workspace OAuth client credentials, owner consent, token storage, Calendar/Gmail provider tests, and worker cron remain outstanding.
 - The Sites deployment remains owner-only pending the other provider, legal, tax, asset, and acceptance gates.
 
 ## 2026-08-18 — Custom-domain preparation
