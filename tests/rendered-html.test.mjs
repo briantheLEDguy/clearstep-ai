@@ -23,7 +23,7 @@ test("configures a GitHub Pages static export", async () => {
 
   assert.match(nextConfig, /output:\s*"export"/u);
   assert.match(workflow, /actions\/upload-pages-artifact@v4/u);
-  assert.match(workflow, /actions\/deploy-pages@v4/u);
+  assert.match(workflow, /actions\/deploy-pages@v5/u);
   assert.match(workflow, /pages:\s*write/u);
   assert.match(workflow, /path:\s*out/u);
 });
