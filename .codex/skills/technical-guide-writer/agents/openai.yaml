@@ -1,0 +1,4 @@
+interface:
+  display_name: "Technical Guide Writer"
+  short_description: "Write concise, skimmable technical articles and how-to guides"
+  default_prompt: "Write a concise, rapid-reading technical guide with practical steps, copy-ready prompts, and a clear outcome."

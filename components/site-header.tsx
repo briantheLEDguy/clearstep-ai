@@ -18,6 +18,7 @@ export function SiteHeader() {
       </Link>
       <nav aria-label="Primary navigation">
         <Link href="/workshops">Workshops</Link>
+        <Link href="/guides">Guides</Link>
         <Link href="/private-workshops">For teams</Link>
         <Link href="/about">About</Link>
         <AdminNavLink />
