@@ -12,7 +12,7 @@
 ### Still gated
 
 - Sites DNS and SSL validation must become active before the custom hostname is used for acceptance testing.
-- Supabase must accept the exact `https://www.clearstep-ai.nl/auth/callback` redirect allowlist entry; the dashboard returned a server error while the hostname was still pending.
+- The Supabase dashboard initially returned a server error while saving the redirect allowlist, but a fresh read confirmed that the exact `https://www.clearstep-ai.nl/auth/callback` entry persisted successfully.
 
 ## 2026-08-18 — Acceptance implementation
 

@@ -2,7 +2,7 @@
 
 Clearstep AI is a branded, SEO-focused workshop catalogue, booking platform, student account area, and protected staff workspace. Its public message is **“Make AI useful. Keep it simple.”**
 
-This repository is an acceptance-stage implementation. It targets Supabase project `besjkfgfhraibrlaiejk` and the Sites project recorded in `.openai/hosting.json`. On 2026-08-18, all seven reviewed migrations and twelve Edge Functions were deployed to that Supabase project, and an owner-only Sites acceptance version was deployed. The seed remains deliberately draft and unsellable. Provider credentials, worker invocation, custom-domain validation, the exact Auth callback allowlist, and public launch remain gated.
+This repository is an acceptance-stage implementation. It targets Supabase project `besjkfgfhraibrlaiejk` and the Sites project recorded in `.openai/hosting.json`. On 2026-08-18, all seven reviewed migrations and twelve Edge Functions were deployed to that Supabase project, and an owner-only Sites acceptance version was deployed. The production Auth Site URL and exact callback allowlist now use `https://www.clearstep-ai.nl`. The seed remains deliberately draft and unsellable. Provider credentials, worker invocation, custom-domain validation, and public launch remain gated.
 
 ## Architecture
 
@@ -122,7 +122,7 @@ Do not publish publicly until all of these gates are complete:
 - Configure remote secrets, install the worker invocation cron, and execute database/provider integration tests. Supabase advisors were run after migration; only intentional private-table/RPC notices and fresh-database unused-index notices remained.
 - Configure Stripe test and live restricted keys, Product/Price IDs, webhook events (including `charge.refunded`), cards/iDEAL, invoices, VAT/tax behavior, and refund operations.
 - Configure separate student and Workspace OAuth clients, connect Brian’s Workspace account, create the dedicated calendar, and test Gmail/Calendar failures and uncertain-email reconciliation.
-- Configure production Auth Site URL, callbacks, Google provider, standard email bootstrap, and the Auth Send Email Hook.
+- Configure the student Google provider, standard email bootstrap, and the Auth Send Email Hook; then verify both production Auth callback paths end to end.
 - Complete provider-backed competition, expiry, duplicate/out-of-order webhook, refund, RLS, invitation, rate-limit, retention, and integration-health tests.
 - Approve the legal entity, VAT details, privacy/terms/cancellation/refund wording, custom domain, and trademark/domain clearance.
 - Replace Canva preview artwork with approved full-resolution logo and brand exports.
