@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-18 — Public-site visual scale and contrast
+
+### Changed
+
+- Tightened the public typography, navigation, card, hero, and section-spacing scale across desktop and mobile layouts.
+- Added explicit foreground and muted-copy colors for light surfaces so the homepage workshop empty state remains readable inside the dark section.
+
 ## 2026-08-18 — GitHub project and Pages migration
 
 ### Changed

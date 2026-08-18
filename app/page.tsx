@@ -60,7 +60,7 @@ export default async function Home() {
               ))}
             </div>
           ) : (
-            <div className="rounded-[26px] border border-[var(--border)] bg-white p-7 md:p-9" role="status">
+            <div className="empty-state rounded-[24px] border border-[var(--border)] bg-white p-7 md:p-8" role="status">
               <h3 className="text-2xl">
                 {catalog.status === "empty" ? "New workshop dates are on the way." : "Workshop dates are being updated."}
               </h3>

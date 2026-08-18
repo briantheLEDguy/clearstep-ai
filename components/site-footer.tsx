@@ -12,7 +12,7 @@ const footerLinks = [
 
 export function SiteFooter() {
   return (
-    <footer className="mt-24 bg-[var(--navy)] py-14 text-[var(--cream)]">
+    <footer className="mt-20 bg-[var(--navy)] py-12 text-[var(--cream)]">
       <div className="shell grid gap-10 md:grid-cols-[1fr_auto] md:items-end">
         <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
