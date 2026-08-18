@@ -6,6 +6,7 @@
 
 - Published the complete project history to the public `briantheLEDguy/clearstep-ai` GitHub repository.
 - Replaced the OpenAI Sites/vinext worker build with a Next.js static export and GitHub Actions Pages deployment.
+- Updated the Pages deployment action to its Node.js 24 release to keep the workflow free of runtime deprecation warnings.
 - Moved request-query handling for sign-in, checkout, waitlist, quote, and staff invitation routes into browser components so those flows remain compatible with static hosting.
 - Added immutable session-specific workshop URLs and an hourly catalogue rebuild workflow so published Supabase workshop data can refresh without an application server.
 - Removed the obsolete Sites hosting metadata, Cloudflare worker entry point, and vinext build configuration.
