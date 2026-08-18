@@ -1,9 +1,3 @@
-import "server-only";
-
-import { unstable_cache } from "next/cache";
-
-export const WORKSHOP_CATALOG_REVALIDATE_SECONDS = 60;
-
 export type WorkshopFormat = "In person" | "Live online" | "Hybrid";
 export type WorkshopStatus = "scheduled" | "sold_out";
 
@@ -253,14 +247,8 @@ async function loadWorkshopCatalog(): Promise<WorkshopCatalog> {
   }
 }
 
-const getCachedWorkshopCatalog = unstable_cache(
-  loadWorkshopCatalog,
-  ["clearstep-public-workshop-catalog-v1"],
-  { revalidate: WORKSHOP_CATALOG_REVALIDATE_SECONDS },
-);
-
 export function getWorkshopCatalog() {
-  return getCachedWorkshopCatalog();
+  return loadWorkshopCatalog();
 }
 
 export async function getWorkshop(slug: string, sessionId?: string) {
@@ -272,6 +260,19 @@ export async function getWorkshop(slug: string, sessionId?: string) {
       item.slug === slug && (!sessionId || (safeSessionId !== undefined && item.sessionId === safeSessionId)),
     ),
   };
+}
+
+export function workshopRouteSegment(workshop: Pick<Workshop, "slug" | "sessionId">) {
+  return `${workshop.slug}--${workshop.sessionId}`;
+}
+
+export async function getWorkshopByRouteSegment(routeSegment: string) {
+  const separatorIndex = routeSegment.lastIndexOf("--");
+  if (separatorIndex < 1) return getWorkshop(routeSegment);
+
+  const slug = routeSegment.slice(0, separatorIndex);
+  const sessionId = routeSegment.slice(separatorIndex + 2);
+  return getWorkshop(slug, sessionId);
 }
 
 export function formatWorkshopDate(workshop: Workshop) {

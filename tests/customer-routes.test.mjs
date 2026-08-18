@@ -2,24 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-let workerPromise;
-
-async function getWorker() {
-  workerPromise ??= import(new URL(`../dist/server/index.js?customer-routes=${process.pid}-${Date.now()}`, import.meta.url).href)
-    .then((module) => module.default);
-  return workerPromise;
+async function exported(path) {
+  const pathname = path.split("?", 1)[0];
+  const relative = pathname === "/" ? "index.html" : `${pathname.slice(1)}/index.html`;
+  return readFile(new URL(`../out/${relative}`, import.meta.url), "utf8");
 }
 
-async function render(path) {
-  const worker = await getWorker();
-  return worker.fetch(
-    new Request(`http://localhost${path}`, { headers: { accept: "text/html" } }),
-    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
-    { waitUntil() {}, passThroughOnException() {} },
-  );
-}
-
-test("server-renders the public customer routes", async () => {
+test("exports the public customer routes", async () => {
   const routes = [
     ["/workshops", "Choose a workshop that starts with real work"],
     ["/private-workshops", "A practical AI workshop shaped around your work"],
@@ -38,23 +27,16 @@ test("server-renders the public customer routes", async () => {
   ];
 
   for (const [path, expectedText] of routes) {
-    const response = await render(path);
-    assert.equal(response.status, 200, path);
-    assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i, path);
-    assert.match(await response.text(), new RegExp(expectedText, "i"), path);
+    assert.match(await exported(path), new RegExp(expectedText, "i"), path);
   }
 });
 
 test("publishes search discovery files without private account routes", async () => {
-  const sitemapResponse = await render("/sitemap.xml");
-  assert.equal(sitemapResponse.status, 200);
-  const sitemap = await sitemapResponse.text();
+  const sitemap = await readFile(new URL("../out/sitemap.xml", import.meta.url), "utf8");
   assert.match(sitemap, /https:\/\/www\.clearstep-ai\.nl\/workshops</);
   assert.doesNotMatch(sitemap, /\/account|\/checkout|\/sign-in|\/staff/);
 
-  const robotsResponse = await render("/robots.txt");
-  assert.equal(robotsResponse.status, 200);
-  const robots = await robotsResponse.text();
+  const robots = await readFile(new URL("../out/robots.txt", import.meta.url), "utf8");
   assert.match(robots, /Disallow:\s*\/staff\//i);
   assert.doesNotMatch(robots, /Disallow:\s*\/account/i);
   assert.doesNotMatch(robots, /Disallow:\s*\/admin/i);
@@ -89,8 +71,9 @@ test("uses the finalized Supabase booking and analytics contracts", async () => 
   assert.match(privateQuoteSource, /body:\s*\{\s*quoteToken\s*\}/);
 });
 
-test("preserves the current Stripe success URL without exposing an unverified success state", async () => {
-  const response = await render("/account/bookings?session=cs_test_clearstep");
-  assert.ok([307, 308].includes(response.status));
-  assert.match(response.headers.get("location") ?? "", /\/checkout\/success\?session_id=cs_test_clearstep$/);
+test("preserves the legacy Stripe success URL in the browser", async () => {
+  const source = await readFile(new URL("../components/query-routed-content.tsx", import.meta.url), "utf8");
+  assert.match(source, /searchParams\.get\("session"\)/u);
+  assert.match(source, /`\/checkout\/success\?session_id=\$\{encodeURIComponent\(sessionId\)\}`/u);
+  assert.match(source, /window\.location\.replace\(destination\)/u);
 });

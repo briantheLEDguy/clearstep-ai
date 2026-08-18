@@ -5,23 +5,28 @@ import { BookingPanel } from "@/components/booking-panel";
 import { PublicPage } from "@/components/public-page";
 import { serializeJsonLd } from "@/lib/json-ld";
 import { getSiteOrigin } from "@/lib/site-origin";
-import { formatWorkshopDate, formatWorkshopLocation, getWorkshop } from "@/lib/workshops";
+import { formatWorkshopDate, formatWorkshopLocation, getWorkshopByRouteSegment, getWorkshopCatalog, workshopRouteSegment } from "@/lib/workshops";
 
 type WorkshopPageProps = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ session?: string | string[] }>;
 };
 
-function requestedSession(value: string | string[] | undefined) {
-  return typeof value === "string" ? value : undefined;
+export async function generateStaticParams() {
+  const catalog = await getWorkshopCatalog();
+  if (catalog.status === "unavailable" && process.env.CI === "true") {
+    throw new Error("Workshop catalog is unavailable; refusing to publish stale workshop routes.");
+  }
+
+  const routeSegments = catalog.workshops.map(workshopRouteSegment);
+  return (routeSegments.length > 0 ? routeSegments : ["unavailable"]).map((slug) => ({ slug }));
 }
 
-export const revalidate = 60;
+export const dynamic = "force-static";
+export const dynamicParams = false;
 
-export async function generateMetadata({ params, searchParams }: WorkshopPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: WorkshopPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const query = await searchParams;
-  const { catalogStatus, workshop } = await getWorkshop(slug, requestedSession(query.session));
+  const { catalogStatus, workshop } = await getWorkshopByRouteSegment(slug);
   if (catalogStatus === "unavailable") {
     return {
       title: "Workshop details temporarily unavailable",
@@ -36,7 +41,7 @@ export async function generateMetadata({ params, searchParams }: WorkshopPagePro
   const title = `${workshop.title} — ${workshop.dateLabel}`;
   const place = workshop.format === "Live online" ? "live online" : `in ${workshop.location}`;
   const description = `${workshop.summary} ${formatWorkshopDate(workshop)}, ${place}.`;
-  const url = `/workshops/${workshop.slug}?session=${encodeURIComponent(workshop.sessionId)}`;
+  const url = `/workshops/${workshopRouteSegment(workshop)}`;
 
   return {
     title,
@@ -47,10 +52,9 @@ export async function generateMetadata({ params, searchParams }: WorkshopPagePro
   };
 }
 
-export default async function WorkshopDetailPage({ params, searchParams }: WorkshopPageProps) {
+export default async function WorkshopDetailPage({ params }: WorkshopPageProps) {
   const { slug } = await params;
-  const query = await searchParams;
-  const { catalogStatus, workshop } = await getWorkshop(slug, requestedSession(query.session));
+  const { catalogStatus, workshop } = await getWorkshopByRouteSegment(slug);
   if (catalogStatus === "unavailable") {
     return (
       <PublicPage>
@@ -68,7 +72,7 @@ export default async function WorkshopDetailPage({ params, searchParams }: Works
   if (!workshop) notFound();
 
   const origin = getSiteOrigin();
-  const workshopUrl = `${origin}/workshops/${workshop.slug}?session=${encodeURIComponent(workshop.sessionId)}`;
+  const workshopUrl = `${origin}/workshops/${workshopRouteSegment(workshop)}`;
   const virtualLocation = { "@type": "VirtualLocation", url: workshopUrl };
   const physicalLocation = { "@type": "Place", name: workshop.location, address: { "@type": "PostalAddress", addressCountry: "NL" } };
   const location = workshop.format === "Live online"

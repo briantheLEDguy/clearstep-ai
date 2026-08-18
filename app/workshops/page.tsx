@@ -4,8 +4,6 @@ import { PublicPage } from "@/components/public-page";
 import { WorkshopCard } from "@/components/workshop-card";
 import { getWorkshopCatalog } from "@/lib/workshops";
 
-export const revalidate = 60;
-
 export const metadata: Metadata = {
   title: "Practical AI workshops",
   description: "Find a welcoming, hands-on Clearstep AI workshop in Amsterdam, Utrecht, or live online.",

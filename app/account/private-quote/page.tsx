@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { PrivateQuoteCheckout } from "@/components/private-quote-checkout";
+import { Suspense } from "react";
+import { PrivateQuoteCheckoutFromQuery } from "@/components/query-routed-content";
 import { PublicPage } from "@/components/public-page";
 
 export const metadata: Metadata = {
@@ -8,13 +9,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function PrivateQuotePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ quote?: string }>;
-}) {
-  const { quote } = await searchParams;
-
+export default function PrivateQuotePage() {
   return (
     <PublicPage>
       <section className="shell py-16 md:py-24">
@@ -24,7 +19,9 @@ export default async function PrivateQuotePage({
           <p className="mx-auto mt-6 max-w-xl text-lg">Sign in with the email address that received the quote, then continue to Stripe’s secure checkout.</p>
         </div>
         <div className="mt-10">
-          <PrivateQuoteCheckout quoteToken={quote} />
+          <Suspense fallback={<p role="status">Loading your quote…</p>}>
+            <PrivateQuoteCheckoutFromQuery />
+          </Suspense>
         </div>
       </section>
     </PublicPage>
