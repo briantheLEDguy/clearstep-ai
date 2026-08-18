@@ -88,8 +88,8 @@ The Edge runtime supplies `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SER
 
 In Authentication → URL Configuration:
 
-- set **Site URL** to the exact production Clearstep origin;
-- add the exact production `/auth/callback` URL to **Redirect URLs**;
+- set **Site URL** to `https://www.clearstep-ai.nl`;
+- add `https://www.clearstep-ai.nl/auth/callback` to **Redirect URLs**;
 - keep local callback URLs only in development.
 
 Student Google login uses a separate public client and the Supabase Auth callback for `besjkfgfhraibrlaiejk`, with identity-only scopes. Workspace automation uses the deployed `google-oauth-callback` Edge URL, offline access, and only Gmail-send/Calendar-events scopes. The Auth hook builds Supabase `/auth/v1/verify` links that return only to Clearstep’s same-origin `/auth/callback`.

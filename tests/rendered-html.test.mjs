@@ -24,7 +24,7 @@ test("server-renders the branded Clearstep home page", async () => {
   assert.match(html, /Make AI useful\./);
   assert.match(html, /Keep it simple\./);
   assert.match(html, /primary-logo\.png/);
-  assert.match(html, /https:\/\/clearstep-ai\.openai\.site/);
+  assert.match(html, /https:\/\/www\.clearstep-ai\.nl/);
   assert.doesNotMatch(html, /http:\/\/localhost:3000/);
   assert.match(html, /Find a workshop/);
   assert.match(html, /Plan a private session/);

@@ -49,7 +49,7 @@ test("publishes search discovery files without private account routes", async ()
   const sitemapResponse = await render("/sitemap.xml");
   assert.equal(sitemapResponse.status, 200);
   const sitemap = await sitemapResponse.text();
-  assert.match(sitemap, /\/workshops</);
+  assert.match(sitemap, /https:\/\/www\.clearstep-ai\.nl\/workshops</);
   assert.doesNotMatch(sitemap, /\/account|\/checkout|\/sign-in|\/staff/);
 
   const robotsResponse = await render("/robots.txt");
@@ -58,7 +58,7 @@ test("publishes search discovery files without private account routes", async ()
   assert.match(robots, /Disallow:\s*\/staff\//i);
   assert.doesNotMatch(robots, /Disallow:\s*\/account/i);
   assert.doesNotMatch(robots, /Disallow:\s*\/admin/i);
-  assert.match(robots, /Sitemap:/i);
+  assert.match(robots, /Sitemap:\s*https:\/\/www\.clearstep-ai\.nl\/sitemap\.xml/i);
 });
 
 test("uses the finalized Supabase booking and analytics contracts", async () => {

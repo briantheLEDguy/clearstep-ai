@@ -2,7 +2,7 @@
 
 Clearstep AI is a branded, SEO-focused workshop catalogue, booking platform, student account area, and protected staff workspace. Its public message is **“Make AI useful. Keep it simple.”**
 
-This repository is an acceptance-stage implementation. It targets Supabase project `besjkfgfhraibrlaiejk` and the Sites project recorded in `.openai/hosting.json`. On 2026-08-18, all seven reviewed migrations and twelve Edge Functions were deployed to that Supabase project; the seed remains deliberately draft and unsellable. Provider credentials, worker invocation, Sites acceptance deployment, and public launch remain gated.
+This repository is an acceptance-stage implementation. It targets Supabase project `besjkfgfhraibrlaiejk` and the Sites project recorded in `.openai/hosting.json`. On 2026-08-18, all seven reviewed migrations and twelve Edge Functions were deployed to that Supabase project, and an owner-only Sites acceptance version was deployed. The seed remains deliberately draft and unsellable. Provider credentials, worker invocation, custom-domain validation, the exact Auth callback allowlist, and public launch remain gated.
 
 ## Architecture
 
@@ -107,15 +107,15 @@ Analytics is first-party and cookie-free. The public endpoint accepts only its e
 
 In Supabase Authentication → URL Configuration:
 
-1. Set **Site URL** to the exact production Clearstep origin.
-2. Add that origin’s exact `/auth/callback` URL to **Redirect URLs**.
+1. Set **Site URL** to `https://www.clearstep-ai.nl`.
+2. Add `https://www.clearstep-ai.nl/auth/callback` to **Redirect URLs**.
 3. Keep local callback URLs only for local development.
 
 Configure the student Google provider with the Supabase Auth callback for project `besjkfgfhraibrlaiejk` and identity-only scopes. Configure Workspace automation separately with the deployed `google-oauth-callback` Edge Function URL, offline access, Gmail-send, and Calendar-events scopes. The application returns the owner to the `/admin#integrations` panel, with a status query parameter. Enable the branded Auth Send Email Hook only after owner bootstrap and verified Gmail sending.
 
 ## Sites acceptance release
 
-The Sites project identifier is stored in `.openai/hosting.json`; the intended slug is `clearstep-ai`. Build the exact reviewed commit, create a **private** acceptance deployment, and verify hosted environment configuration. There is currently no claimed deployment.
+The Sites project identifier is stored in `.openai/hosting.json`; the intended slug is `clearstep-ai`. The current deployment is owner-only. The custom hostname `www.clearstep-ai.nl` is attached and must reach active domain and SSL status before public release. Build and deploy only the exact reviewed commit with `NEXT_PUBLIC_SITE_URL=https://www.clearstep-ai.nl`.
 
 Do not publish publicly until all of these gates are complete:
 

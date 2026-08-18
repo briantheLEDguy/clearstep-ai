@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-08-18 — Custom-domain preparation
+
+### Changed
+
+- Switched canonical metadata, sitemap, robots, checkout return URLs, invitations, quotes, and other server-generated links to `https://www.clearstep-ai.nl`.
+- Updated the Sites production environment and Supabase production Site URL for the attached `www.clearstep-ai.nl` hostname while preserving owner-only access.
+- Added the matching `PUBLIC_SITE_URL` Edge Function secret without exposing provider credentials.
+- Tightened rendered-page and search-discovery tests to require the custom-domain origin.
+
+### Still gated
+
+- Sites DNS and SSL validation must become active before the custom hostname is used for acceptance testing.
+- Supabase must accept the exact `https://www.clearstep-ai.nl/auth/callback` redirect allowlist entry; the dashboard returned a server error while the hostname was still pending.
+
 ## 2026-08-18 — Acceptance implementation
 
 ### Added
