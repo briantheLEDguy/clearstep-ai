@@ -15,6 +15,21 @@ test("exports the branded Clearstep home page", async () => {
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });
 
+test("keeps the public type scale compact and light surfaces readable", async () => {
+  const [page, styles] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(styles, /body\s*\{[^}]*font-size:\s*17px/su);
+  assert.match(styles, /h1\s*\{[^}]*clamp\(44px,\s*6vw,\s*70px\)/su);
+  assert.match(styles, /\.empty-state\s*\{\s*color:\s*var\(--navy\);\s*\}/u);
+  assert.match(styles, /\.empty-state p\s*\{\s*color:\s*var\(--text-muted\);\s*\}/u);
+  assert.match(styles, /\.workshop-preview \.empty-state \.text-link\s*\{\s*color:\s*var\(--action\);\s*\}/u);
+  assert.match(styles, /\.hero-copy\s*\{\s*min-width:\s*0;\s*\}/u);
+  assert.match(page, /className="empty-state [^"]*bg-white/u);
+});
+
 test("configures a GitHub Pages static export", async () => {
   const [nextConfig, workflow] = await Promise.all([
     readFile(new URL("../next.config.ts", import.meta.url), "utf8"),

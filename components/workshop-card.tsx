@@ -7,7 +7,7 @@ export function WorkshopCard({ workshop, headingLevel = "h2" }: { workshop: Work
   return (
     <article className="workshop-card border border-[var(--border)] shadow-[0_18px_45px_rgba(16,42,67,.08)]">
       <p className="card-eyebrow">{workshop.eyebrow}</p>
-      <Heading className="text-[2rem] leading-tight">{workshop.title}</Heading>
+      <Heading className="text-[1.7rem] leading-tight">{workshop.title}</Heading>
       <p>{workshop.summary}</p>
       <div className="workshop-meta">
         <span>{formatWorkshopDate(workshop)}</span>
@@ -15,7 +15,7 @@ export function WorkshopCard({ workshop, headingLevel = "h2" }: { workshop: Work
         <strong>{formatWorkshopAvailability(workshop)}</strong>
       </div>
       <div className="mt-6 flex items-center justify-between gap-4">
-        <strong className="font-[var(--font-manrope)] text-xl">{workshop.priceLabel}</strong>
+        <strong className="font-[var(--font-manrope)] text-lg">{workshop.priceLabel}</strong>
         <Link className="card-link mt-0" href={`/workshops/${workshopRouteSegment(workshop)}`} aria-label={`View ${workshop.title} on ${workshop.dateLabel}`} data-analytics-event="cta_workshop_detail">
           View workshop <span aria-hidden="true">→</span>
         </Link>
