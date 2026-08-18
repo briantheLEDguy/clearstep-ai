@@ -1,0 +1,129 @@
+# Clearstep AI
+
+Clearstep AI is a branded, SEO-focused workshop catalogue, booking platform, student account area, and protected staff workspace. Its public message is **“Make AI useful. Keep it simple.”**
+
+This repository is an acceptance-stage implementation. It targets Supabase project `besjkfgfhraibrlaiejk` and the Sites project recorded in `.openai/hosting.json`. On 2026-08-18, all seven reviewed migrations and twelve Edge Functions were deployed to that Supabase project; the seed remains deliberately draft and unsellable. Provider credentials, worker invocation, Sites acceptance deployment, and public launch remain gated.
+
+## Architecture
+
+```text
+OpenAI Sites / vinext
+  ├─ server-rendered public catalogue and metadata
+  ├─ authenticated student and staff interfaces
+  └─ Supabase client using only the publishable key
+       ├─ Auth: magic links and student Google login
+       ├─ Postgres: RLS-protected public data and private operational data
+       ├─ Edge Functions: Stripe, staff, analytics, Google and email APIs
+       └─ PGMQ + cron: durable booking and automation work
+```
+
+Supabase is authoritative for catalogue availability, identity, capacity, holds, enrollments, payments, waitlists, staff roles, automation state, and analytics. Public workshop pages load the sanitized `public_workshop_catalog()` RPC on the server with a 60-second cache. Money is integer EUR cents; database times are UTC `timestamptz` and display primarily in `Europe/Amsterdam`.
+
+## Routes
+
+Indexable public routes:
+
+- `/`
+- `/workshops` and `/workshops/[slug]`
+- `/private-workshops`
+- `/about`, `/faq`
+- `/privacy`, `/terms`, `/cancellation`
+
+Identity and noindex routes:
+
+- `/sign-in`, `/auth/callback`
+- `/account`, `/account/bookings`, `/account/waitlist`, `/account/private-quote`
+- `/checkout/success`, `/checkout/cancel`
+- `/staff/invite`
+- `/admin`
+
+The application supplies canonical metadata, sitemap/robots rules, Open Graph data, and Organization, Course, Event, and breadcrumb structured data. Account, invitation, checkout-result, and staff routes are excluded from indexing.
+
+## Authentication and staff access
+
+Checkout requires Supabase Auth with email magic links or student Google login. Student Google identity uses a separate public OAuth client from Workspace automation.
+
+- `owner`: all operations, team access, roles, and integrations
+- `admin`: workshops, bookings, waitlists, private requests/quotes, and analytics
+- `analyst`: `analytics_summary` plus the caller’s own staff context only
+
+`brian@bncconsulting.co` is the verified bootstrap owner. Other staff enter through a seven-day, single-use invitation accepted while signed in with the invited verified email. Only a token hash is stored in the invitation record. Raw delivery links are removed from completed automation payloads and have expiry-based/31-day fallback redaction.
+
+## Local setup
+
+Use Node.js `>=22.13.0`.
+
+```text
+npm install
+npm run dev
+npm run lint
+npx tsc --noEmit --incremental false
+npm test
+```
+
+Copy `.env.example` to `.env.local` for local development. Do not commit secrets.
+
+Sites/browser variable names:
+
+```text
+NEXT_PUBLIC_SITE_URL
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+```
+
+Supabase Edge Function secret names:
+
+```text
+PUBLIC_SITE_URL
+ADMIN_NOTIFICATION_EMAIL
+RATE_LIMIT_HASH_SALT
+STRIPE_API_KEY
+STRIPE_WEBHOOK_SIGNING_SECRET
+STRIPE_AUTOMATIC_TAX_ENABLED
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+GOOGLE_OAUTH_REDIRECT_URI
+GOOGLE_WORKSPACE_EMAIL
+GOOGLE_WORKSPACE_DOMAIN
+GOOGLE_CALENDAR_ID
+SEND_EMAIL_HOOK_SECRET
+```
+
+The Edge runtime provides `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Never expose a secret or service-role credential through a `NEXT_PUBLIC_` variable.
+
+## Supabase and provider operations
+
+Review and apply the seven migrations in lexical order, deploy the twelve functions with `supabase/config.toml`, and set runtime secrets only in the verified `besjkfgfhraibrlaiejk` project. The final hardening migration moves Workspace OAuth tokens to Supabase Vault, adds the public analytics throttle, protects Gmail delivery intents, serializes Calendar work per session, caps quote checkout, and redacts sensitive delivery payloads. See `supabase/README.md` for the exact inventory and runbook.
+
+Stripe Checkout uses stored VAT-inclusive EUR Prices, invoices, dynamic payment methods, and a verified raw-body webhook. The browser never supplies an amount. A Checkout Session must fit Stripe’s minimum window and may not outlive its database hold, private-quote deadline, or workshop start. Enrollment is webhook-owned; success-page visits are read-only. Unsettled asynchronous payments time out after their authoritative grace window, release the provisional seat, and alert the customer and Brian. A later paid event still enters final capacity/post-start checks. Late payments that cannot be allocated are persisted as refund remediation and keep integration health degraded until resolved.
+
+Workspace automation uses a dedicated **Clearstep Workshops** calendar. Sessions are provisioned before sale; online/hybrid sessions are not ready until Meet creation returns a URL. Per-session leases serialize attendee changes, every job rebuilds mutable event fields from current database state, and each online transition derives a new Meet request ID from the session revision while retries of that transition reuse it. If Google marks creation as failed, the provider request fingerprint derives the next stable recovery ID. A change to in-person explicitly clears conference data and the stored Meet URL. Full refunds remove only the refunded attendee, while stale add jobs check current enrollment status. Gmail outbox delivery uses a durable send intent and deterministic RFC Message-ID. Explicit 401 responses refresh authorization and retry once; rejected 429/5xx requests use queue backoff. An ambiguous transport/post-send failure is marked `uncertain` instead of being automatically resent, and the owner must check Gmail before confirming delivery or explicitly retrying a verified-unsent message.
+
+PGMQ is the durable transport. `private.automation_jobs` supplies logical deduplication, status, attempts, and operator visibility; `pgmq.read`, `set_vt`, and `archive` supply claim/retry/archive behavior. Cron handles booking maintenance, analytics retention, runtime-security cleanup, and—after separate Vault/`pg_net` setup—the worker invocation.
+
+Analytics is first-party and cookie-free. The public endpoint accepts only its explicit event and per-event property allowlists; browser-supplied transaction identifiers and arbitrary properties are rejected. `checkout_started`, enrollments, revenue, refunds, and operational failures are server-authoritative. A ten-minute HMAC abuse key is kept only in a private rate-limit table and is never written to an analytics row. No raw IP or user agent is retained. Raw events are kept 90 days and daily aggregates 24 months.
+
+## Production Auth and Google callback
+
+In Supabase Authentication → URL Configuration:
+
+1. Set **Site URL** to the exact production Clearstep origin.
+2. Add that origin’s exact `/auth/callback` URL to **Redirect URLs**.
+3. Keep local callback URLs only for local development.
+
+Configure the student Google provider with the Supabase Auth callback for project `besjkfgfhraibrlaiejk` and identity-only scopes. Configure Workspace automation separately with the deployed `google-oauth-callback` Edge Function URL, offline access, Gmail-send, and Calendar-events scopes. The application returns the owner to the `/admin#integrations` panel, with a status query parameter. Enable the branded Auth Send Email Hook only after owner bootstrap and verified Gmail sending.
+
+## Sites acceptance release
+
+The Sites project identifier is stored in `.openai/hosting.json`; the intended slug is `clearstep-ai`. Build the exact reviewed commit, create a **private** acceptance deployment, and verify hosted environment configuration. There is currently no claimed deployment.
+
+Do not publish publicly until all of these gates are complete:
+
+- Configure remote secrets, install the worker invocation cron, and execute database/provider integration tests. Supabase advisors were run after migration; only intentional private-table/RPC notices and fresh-database unused-index notices remained.
+- Configure Stripe test and live restricted keys, Product/Price IDs, webhook events (including `charge.refunded`), cards/iDEAL, invoices, VAT/tax behavior, and refund operations.
+- Configure separate student and Workspace OAuth clients, connect Brian’s Workspace account, create the dedicated calendar, and test Gmail/Calendar failures and uncertain-email reconciliation.
+- Configure production Auth Site URL, callbacks, Google provider, standard email bootstrap, and the Auth Send Email Hook.
+- Complete provider-backed competition, expiry, duplicate/out-of-order webhook, refund, RLS, invitation, rate-limit, retention, and integration-health tests.
+- Approve the legal entity, VAT details, privacy/terms/cancellation/refund wording, custom domain, and trademark/domain clearance.
+- Replace Canva preview artwork with approved full-resolution logo and brand exports.
+- Complete a private Sites acceptance review and receive explicit approval for public release.
