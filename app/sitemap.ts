@@ -1,9 +1,9 @@
 import type { MetadataRoute } from "next";
 import { getSiteOrigin } from "@/lib/site-origin";
-import { getWorkshopCatalog } from "@/lib/workshops";
+import { getWorkshopCatalog, workshopRouteSegment } from "@/lib/workshops";
 
 const lastModified = new Date("2026-08-18T00:00:00Z");
-export const revalidate = 60;
+export const dynamic = "force-static";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = getSiteOrigin();
@@ -17,7 +17,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: path === "" ? 1 : path === "/workshops" ? 0.9 : 0.6,
     })),
     ...catalog.workshops.map((workshop) => ({
-      url: `${baseUrl}/workshops/${workshop.slug}?session=${encodeURIComponent(workshop.sessionId)}`,
+      url: `${baseUrl}/workshops/${workshopRouteSegment(workshop)}`,
       lastModified,
       changeFrequency: "weekly" as const,
       priority: 0.8,

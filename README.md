@@ -2,13 +2,13 @@
 
 Clearstep AI is a branded, SEO-focused workshop catalogue, booking platform, student account area, and protected staff workspace. Its public message is **“Make AI useful. Keep it simple.”**
 
-This repository is an acceptance-stage implementation. It targets Supabase project `besjkfgfhraibrlaiejk` and the Sites project recorded in `.openai/hosting.json`. On 2026-08-18, all seven reviewed migrations and twelve Edge Functions were deployed to that Supabase project, and an owner-only Sites acceptance version was deployed. The production Auth Site URL and exact callback allowlist now use `https://www.clearstep-ai.nl`, and the attached hostname has active routing and SSL. The Stripe sandbox has a rotated server key, three matching draft Product/Price pairs, and a signed webhook that passed a non-payment health probe. The exact secondary `Clearstep Workshops` calendar, Workspace identity, callback, owner notification address, analytics abuse salt, and disabled automatic-tax flag are configured in Supabase; the Google OAuth client and owner authorization are not. The seed remains deliberately draft and unsellable. Stripe account activation, provider acceptance, worker invocation, and public launch remain gated.
+This repository is an acceptance-stage implementation targeting Supabase project `besjkfgfhraibrlaiejk`. The site is built as a static Next.js export and deployed by GitHub Actions to GitHub Pages. Supabase remains the runtime system for identity, catalogue data, booking operations, staff access, analytics, and provider automation. The production Auth Site URL and exact callback allowlist use `https://www.clearstep-ai.nl`. The Stripe sandbox has a rotated server key, three matching draft Product/Price pairs, and a signed webhook that passed a non-payment health probe. The exact secondary `Clearstep Workshops` calendar, Workspace identity, callback, owner notification address, analytics abuse salt, and disabled automatic-tax flag are configured in Supabase; the Google OAuth client and owner authorization are not. The seed remains deliberately draft and unsellable. Stripe account activation, provider acceptance, worker invocation, and public launch remain gated.
 
 ## Architecture
 
 ```text
-OpenAI Sites / vinext
-  ├─ server-rendered public catalogue and metadata
+GitHub Pages / Next.js static export
+  ├─ prerendered public catalogue and metadata
   ├─ authenticated student and staff interfaces
   └─ Supabase client using only the publishable key
        ├─ Auth: magic links and student Google login
@@ -17,14 +17,14 @@ OpenAI Sites / vinext
        └─ PGMQ + cron: durable booking and automation work
 ```
 
-Supabase is authoritative for catalogue availability, identity, capacity, holds, enrollments, payments, waitlists, staff roles, automation state, and analytics. Public workshop pages load the sanitized `public_workshop_catalog()` RPC on the server with a 60-second cache. Money is integer EUR cents; database times are UTC `timestamptz` and display primarily in `Europe/Amsterdam`.
+Supabase is authoritative for catalogue availability, identity, capacity, holds, enrollments, payments, waitlists, staff roles, automation state, and analytics. GitHub Actions loads the sanitized `public_workshop_catalog()` RPC while producing the static Pages artifact; an hourly scheduled workflow refreshes published workshop pages. Each published session receives an immutable `/workshops/[course-slug]--[session-id]` URL. Money is integer EUR cents; database times are UTC `timestamptz` and display primarily in `Europe/Amsterdam`.
 
 ## Routes
 
 Indexable public routes:
 
 - `/`
-- `/workshops` and `/workshops/[slug]`
+- `/workshops` and `/workshops/[course-slug]--[session-id]`
 - `/private-workshops`
 - `/about`, `/faq`
 - `/privacy`, `/terms`, `/cancellation`
@@ -63,7 +63,7 @@ npm test
 
 Copy `.env.example` to `.env.local` for local development. Do not commit secrets.
 
-Sites/browser variable names:
+Browser and GitHub Actions repository variable names:
 
 ```text
 NEXT_PUBLIC_SITE_URL
@@ -113,9 +113,11 @@ In Supabase Authentication → URL Configuration:
 
 Configure the student Google provider with the Supabase Auth callback for project `besjkfgfhraibrlaiejk` and identity-only scopes. Configure Workspace automation separately with the deployed `google-oauth-callback` Edge Function URL, offline access, Gmail-send, and Calendar-events scopes. The application returns the owner to the `/admin#integrations` panel, with a status query parameter. Enable the branded Auth Send Email Hook only after owner bootstrap and verified Gmail sending.
 
-## Sites acceptance release
+## GitHub Pages release
 
-The Sites project identifier is stored in `.openai/hosting.json`; the intended slug is `clearstep-ai`. The current deployment is owner-only. The custom hostname `www.clearstep-ai.nl` has active routing and SSL. Build and deploy only the exact reviewed commit with `NEXT_PUBLIC_SITE_URL=https://www.clearstep-ai.nl`.
+The workflow in `.github/workflows/pages.yml` tests and exports the site on every push to `main`, on manual dispatch, and hourly for catalogue refreshes. Configure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as GitHub Actions repository variables. Pages uses `www.clearstep-ai.nl` as its custom domain; the DNS `CNAME` must point directly to `briantheLEDguy.github.io`.
+
+GitHub Pages cannot add application-defined HTTP response headers. The previous worker-level CSP, `X-Frame-Options`, and related headers therefore do not carry over. Do not treat static hosting as a privileged security boundary: Supabase RLS, verified Auth identities, and Edge Function authorization remain mandatory for every private or administrative operation.
 
 Do not publish publicly until all of these gates are complete:
 
@@ -126,4 +128,4 @@ Do not publish publicly until all of these gates are complete:
 - Complete provider-backed competition, expiry, duplicate/out-of-order webhook, refund, RLS, invitation, rate-limit, retention, and integration-health tests.
 - Approve the legal entity, VAT details, privacy/terms/cancellation/refund wording, custom domain, and trademark/domain clearance.
 - Replace Canva preview artwork with approved full-resolution logo and brand exports.
-- Complete a private Sites acceptance review and receive explicit approval for public release.
+- Complete a production Pages acceptance review and receive explicit approval for public release.

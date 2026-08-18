@@ -4,7 +4,7 @@ import test from "node:test";
 
 const source = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("public workshop pages read the sanitized Supabase catalog on the server", async () => {
+test("the Pages build reads the sanitized Supabase workshop catalog", async () => {
   const [catalog, home, listing, detail, sitemap] = await Promise.all([
     source("../lib/workshops.ts"),
     source("../app/page.tsx"),
@@ -13,17 +13,18 @@ test("public workshop pages read the sanitized Supabase catalog on the server", 
     source("../app/sitemap.ts"),
   ]);
 
-  assert.match(catalog, /import\s+"server-only"/u);
   assert.match(catalog, /\/rest\/v1\/rpc\/public_workshop_catalog/u);
   assert.match(catalog, /NEXT_PUBLIC_SUPABASE_URL/u);
   assert.match(catalog, /NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY/u);
   assert.match(catalog, /headers:[\s\S]*apikey:\s*publishableKey/u);
-  assert.match(catalog, /unstable_cache[\s\S]*revalidate:\s*WORKSHOP_CATALOG_REVALIDATE_SECONDS/u);
+  assert.match(catalog, /return loadWorkshopCatalog\(\)/u);
+  assert.doesNotMatch(catalog, /unstable_cache|server-only/u);
   assert.doesNotMatch(catalog, /service_role|SUPABASE_SECRET_KEY/u);
 
-  for (const page of [home, listing, detail, sitemap]) {
+  for (const page of [home, listing, sitemap]) {
     assert.match(page, /getWorkshop(?:Catalog)?\(/u);
   }
+  assert.match(detail, /getWorkshopByRouteSegment\(/u);
 });
 
 test("catalog mapping validates booking, price, schedule, and capacity fields", async () => {
@@ -70,19 +71,22 @@ test("the public frontend contains no hardcoded catalog inventory", async () => 
   assert.match(combined, /not showing placeholder dates|cannot show reliable dates/u);
 });
 
-test("every workshop card and detail lookup stays bound to its session", async () => {
-  const [catalog, card, detail, sitemap] = await Promise.all([
+test("every exported workshop URL stays bound to its session", async () => {
+  const [catalog, card, detail, booking, sitemap] = await Promise.all([
     source("../lib/workshops.ts"),
     source("../components/workshop-card.tsx"),
     source("../app/workshops/[slug]/page.tsx"),
+    source("../components/booking-panel.tsx"),
     source("../app/sitemap.ts"),
   ]);
 
-  assert.match(card, /\?session=\$\{encodeURIComponent\(workshop\.sessionId\)\}/u);
+  assert.match(card, /workshopRouteSegment\(workshop\)/u);
   assert.match(catalog, /item\.slug\s*===\s*slug[\s\S]*item\.sessionId\s*===\s*safeSessionId/u);
-  assert.match(detail, /getWorkshop\(slug,\s*requestedSession\(query\.session\)\)/u);
-  assert.match(detail, /\?session=\$\{encodeURIComponent\(workshop\.sessionId\)\}/u);
-  assert.match(sitemap, /catalog\.workshops\.map[\s\S]*workshop\.sessionId/u);
+  assert.match(catalog, /`\$\{workshop\.slug\}--\$\{workshop\.sessionId\}`/u);
+  assert.match(detail, /getWorkshopByRouteSegment\(slug\)/u);
+  assert.match(detail, /generateStaticParams/u);
+  assert.match(booking, /`\/workshops\/\$\{workshopSlug\}--\$\{sessionId\}`/u);
+  assert.match(sitemap, /catalog\.workshops\.map[\s\S]*workshopRouteSegment\(workshop\)/u);
 });
 
 test("admin-editable workshop copy cannot break out of JSON-LD scripts", async () => {

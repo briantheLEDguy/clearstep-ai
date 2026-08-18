@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
-import { Manrope, Source_Sans_3 } from "next/font/google";
+import localFont from "next/font/local";
 import { serializeJsonLd } from "@/lib/json-ld";
 import { getSiteOrigin } from "@/lib/site-origin";
 import "./globals.css";
 
-const manrope = Manrope({
+const manrope = localFont({
+  src: "../public/fonts/manrope-latin.woff2",
   variable: "--font-manrope",
-  subsets: ["latin"],
   display: "swap",
+  weight: "200 800",
 });
 
-const sourceSans = Source_Sans_3({
+const sourceSans = localFont({
+  src: "../public/fonts/source-sans-3-latin.woff2",
   variable: "--font-source-sans",
-  subsets: ["latin"],
   display: "swap",
+  weight: "200 900",
 });
 
 export function generateMetadata(): Metadata {

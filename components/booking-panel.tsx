@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { functionErrorMessage, unwrapFunctionData } from "@/lib/supabase/functions";
@@ -14,6 +15,7 @@ type BookingPanelProps = {
 };
 
 export function BookingPanel({ workshopSlug, workshopTitle, sessionId, seatsLeft, priceLabel }: BookingPanelProps) {
+  const router = useRouter();
   const [state, setState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const soldOut = seatsLeft < 1;
@@ -31,8 +33,8 @@ export function BookingPanel({ workshopSlug, workshopTitle, sessionId, seatsLeft
 
     const { data: sessionData } = await client.auth.getSession();
     if (!sessionData.session) {
-      const next = `/workshops/${workshopSlug}`;
-      window.location.assign(`/sign-in?next=${encodeURIComponent(next)}`);
+      const next = `/workshops/${workshopSlug}--${sessionId}`;
+      router.push(`/sign-in?next=${encodeURIComponent(next)}`);
       return;
     }
 

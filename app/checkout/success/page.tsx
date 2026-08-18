@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CheckoutStatus } from "@/components/checkout-status";
+import { Suspense } from "react";
+import { CheckoutStatusFromQuery } from "@/components/query-routed-content";
 import { PublicPage } from "@/components/public-page";
 
 export const metadata: Metadata = {
@@ -9,11 +10,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function CheckoutSuccessPage({ searchParams }: { searchParams: Promise<{ session_id?: string | string[] }> }) {
-  const params = await searchParams;
-  const rawId = Array.isArray(params.session_id) ? params.session_id[0] : params.session_id;
-  const checkoutSessionId = rawId?.startsWith("cs_") ? rawId : undefined;
-
+export default function CheckoutSuccessPage() {
   return (
     <PublicPage>
       <section className="shell py-16 md:py-24">
@@ -21,7 +18,9 @@ export default async function CheckoutSuccessPage({ searchParams }: { searchPara
           <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[var(--green)] text-3xl font-bold text-white" aria-hidden="true">✓</span>
           <p className="eyebrow mt-7">Payment returned successfully</p>
           <h1 className="text-[clamp(2.7rem,7vw,4.4rem)] leading-[1.04]">Thanks—your next clear step is underway.</h1>
-          <CheckoutStatus checkoutSessionId={checkoutSessionId} />
+          <Suspense fallback={<p role="status">Checking your booking…</p>}>
+            <CheckoutStatusFromQuery />
+          </Suspense>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link className="button button-primary" href="/account">View your account</Link>
             <Link className="button border border-[var(--navy)]" href="/workshops">Browse workshops</Link>
