@@ -27,6 +27,7 @@ test("runtime hardening and later admin controls have ordered migrations", async
     "20260819125320_strict_anonymous_analytics_schema.sql",
     "20260819140629_versioned_checkout_legal_acceptance.sql",
     "20260819161227_bnc_service_commerce.sql",
+    "20260819184150_scope_service_checkout_session_guard.sql",
   ]);
 });
 
@@ -747,6 +748,8 @@ test("checkout, waitlist, and quote windows honor start time, FIFO, and token re
   const booking = await read("migrations/20260818130100_booking_workflows.sql");
   const admin = await read("migrations/20260818130200_admin_analytics_automation.sql");
   const runtime = await read("migrations/20260818130500_runtime_security_hardening.sql");
+  const service = await read("migrations/20260819161227_bnc_service_commerce.sql");
+  const checkoutScope = await read("migrations/20260819184150_scope_service_checkout_session_guard.sql");
   const checkout = booking.match(/create or replace function public\.create_checkout_hold[\s\S]*?\$\$;/u)?.[0] ?? "";
   const offer = admin.slice(admin.indexOf("when 'waitlist_offer'"), admin.indexOf("when 'waitlist_remove'"));
   const quoteSend = admin.slice(admin.indexOf("when 'quote_send'"), admin.indexOf("when 'analytics_summary'"));
@@ -754,6 +757,14 @@ test("checkout, waitlist, and quote windows honor start time, FIFO, and token re
   assert.match(core, /seat_hold_must_expire_before_session_start/u);
   assert.match(core, /checkout_must_settle_by_session_start/u);
   assert.match(core, /waitlist_offer_exceeds_booking_deadline/u);
+  assert.match(checkoutScope, /create or replace function private\.enforce_checkout_before_session_start\(\)/u);
+  assert.match(checkoutScope, /if new\.checkout_kind = 'service_order' then\s+return new;\s+end if;/u);
+  assert.match(checkoutScope, /where s\.id = new\.session_id\s+and new\.expires_at < s\.start_at\s+and new\.grace_expires_at <= s\.start_at/u);
+  assert.match(checkoutScope, /message = 'checkout_must_settle_by_session_start'/u);
+  assert.match(checkoutScope, /revoke execute on function private\.enforce_checkout_before_session_start\(\)\s+from public, anon, authenticated, service_role;/u);
+  assert.doesNotMatch(checkoutScope, /(?:create|drop) trigger/u);
+  assert.match(service, /constraint checkout_attempts_target_valid check[\s\S]*checkout_kind = 'service_order'[\s\S]*hold_id is null[\s\S]*session_id is null[\s\S]*service_offering_id is not null/u);
+  assert.match(service, /create unique index checkout_attempts_one_active_per_user_service_idx[\s\S]*where checkout_kind = 'service_order'[\s\S]*status in \('creating', 'open', 'payment_pending'\)/u);
   assert.match(checkout, /v_booking_deadline_at := v_session\.start_at - interval '32 minutes'/u);
   assert.match(checkout, /'checkout_expires_at', v_checkout\.expires_at/u);
   assert.match(checkout, /'booking_deadline_at', v_booking_deadline_at/u);

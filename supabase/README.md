@@ -33,6 +33,7 @@ Apply these files in lexical order:
 13. `20260819125320_strict_anonymous_analytics_schema.sql` — removes legacy account/route/referrer/campaign/JSON analytics columns and stores course views through a direct first-party course ID
 14. `20260819140629_versioned_checkout_legal_acceptance.sql` — preserves every distinct Terms/Cancellation version acknowledged when an active checkout is retried
 15. `20260819161227_bnc_service_commerce.sql` — shared service lines, draft Plate & Post offerings, service checkout/orders, customer ownership, staff fulfilment, aggregate analytics, and webhook-authoritative payment/refund processing
+16. `20260819184150_scope_service_checkout_session_guard.sql` — scopes the legacy workshop session-start trigger away from fixed-service checkouts while retaining workshop expiry and target-shape enforcement
 
 Before a remote change, verify the linked project and its migration history. Use a non-production project for destructive reset or seed experiments. A source file alone does not establish that a remote migration was applied.
 
@@ -122,7 +123,7 @@ The checkout Edge Function requires an explicit acknowledgement and records the 
 
 1. Confirm the target project reference, environment, and change window. Compare local and linked history with `npx supabase migration list --linked`; stop if the remote contains an unexpected migration, a local predecessor is missing remotely, or the order diverges. Resolve drift without editing historical files.
 2. Review the migration diff and role/RLS impact; use an isolated database for reset or migration experiments.
-3. Apply pending migrations only after backup/rollback and owner approval are in place. Confirm migration 15 leaves all three Plate & Post offerings draft with null Stripe IDs.
+3. Apply pending migrations only after backup/rollback and owner approval are in place. Apply migrations 15 and 16 together: migration 15 leaves all three Plate & Post offerings draft with null Stripe IDs, and migration 16 permits their session-less checkout shape without weakening workshop timing checks.
 4. Deploy the matching `admin-catalog`, `create-checkout`, `customer-requests`, `stripe-webhook`, `automation-worker`, and `auth-send-email-hook` bundles, then verify their `config.toml` JWT modes. Shared helper changes are bundled only when an importing Function is deployed.
 5. Set or rotate runtime secrets through Supabase secret management, not source control or frontend configuration. Attach and publish test-mode service Products/Prices only through the reviewed staff/provider procedure above.
 6. Exercise anonymous, customer, analyst, admin, and owner boundaries; test both checkout kinds, webhook/provider paths, service-order ownership, staff fulfilment transitions, email jobs, refunds, and duplicate/out-of-order events with test credentials.
@@ -144,4 +145,4 @@ npm run test:a11y
 npm run test:db
 ```
 
-`npm run test:db` requires Docker and applies migrations to a disposable local Supabase stack before running pgTAP. At the 2026-08-19 BNC handoff, the suite contains 109 assertions but was not executed because Docker Desktop is unavailable in the workspace; run it in a Docker-capable environment before applying migration 15. These checks do not replace end-to-end tests against Stripe and Google test credentials. See the root [release gate](../README.md#release-gate) and [compliance/accessibility guide](../docs/compliance-accessibility.md) before public launch.
+`npm run test:db` requires Docker and applies migrations to a disposable local Supabase stack before running 113 pgTAP assertions. Docker Desktop is unavailable in this workspace, so GitHub Actions' disposable Supabase job is the required database verification gate before migrations 15 and 16 are applied remotely. These checks do not replace end-to-end tests against Stripe and Google test credentials. See the root [release gate](../README.md#release-gate) and [compliance/accessibility guide](../docs/compliance-accessibility.md) before public launch.

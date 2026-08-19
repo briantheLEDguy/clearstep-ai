@@ -18,6 +18,10 @@
 - Seeded Basic Product Shoot (€50), Video Content (€75), and Combo Package (€100) as unpublished drafts. Public prices, detail indexing, and Checkout stay gated until matching same-account Stripe test Products and one-time EUR Prices with `tax_behavior=inclusive` are verified and an owner or administrator publishes each offering; finance approval and Checkout/invoice VAT evidence remain separate launch gates.
 - Updated the shared account, email wrapper, and `2026-08-19.2` legal-document release for both service lines; human-reviewed customer requests can target one owned workshop enrollment or service order.
 
+### Fixed
+
+- Scoped the legacy workshop session-start checkout trigger away from Plate & Post service orders while retaining workshop timing, service target-shape, and one-active-attempt enforcement.
+
 ### Operational note
 
 - No registrar, DNS, Cloudflare, Supabase, Stripe, or Google production setting is changed by the repository work; the runbooks require separate migration, Function deployment, provider, DNS, and acceptance evidence before public-release claims or permanent redirects.

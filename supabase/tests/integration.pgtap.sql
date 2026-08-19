@@ -6,7 +6,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(111);
+select plan(113);
 
 -- Fixed fixture identities make the role and ownership assertions readable.
 insert into auth.users (id, email, email_confirmed_at)
@@ -173,6 +173,20 @@ select throws_ok(
   'P0001',
   'session_full',
   'a second customer cannot receive the capacity-one checkout hold'
+);
+select throws_ok(
+  $$update private.checkout_attempts
+    set grace_expires_at = (
+      select start_at + interval '1 second'
+      from public.workshop_sessions
+      where id = '30000000-0000-4000-8000-000000000001'::uuid
+    )
+    where checkout_kind = 'workshop'
+      and session_id = '30000000-0000-4000-8000-000000000001'::uuid
+      and user_id = '10000000-0000-4000-8000-000000000003'::uuid$$,
+  '23514',
+  'checkout_must_settle_by_session_start',
+  'a workshop checkout still cannot settle after its session starts'
 );
 
 select is(
@@ -847,6 +861,15 @@ select (public.create_service_checkout_attempt(
   '10000000-0000-4000-8000-000000000002',
   'integration-admin@example.test'
 ) ->> 'checkout_id')::uuid;
+
+select throws_ok(
+  $$update private.checkout_attempts
+    set session_id = '30000000-0000-4000-8000-000000000001'::uuid
+    where id = (select staff_checkout_id from integration_service_fixture)$$,
+  '23514',
+  'new row for relation "checkout_attempts" violates check constraint "checkout_attempts_target_valid"',
+  'a service checkout cannot acquire a workshop session target'
+);
 
 select ok(
   (
