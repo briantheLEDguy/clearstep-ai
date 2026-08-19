@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-08-19 — Dynamic Guides reading experience
+
+### Changed
+
+- Reworked the nine Guides into distinct editorial formats: field guide, prompt lab, four-pass audit, planning sprint, evidence board, message clinic, workflow canvas, Codex runbook, and seven-day improvement loop.
+- Added format-specific layouts, varied section ordering, worked before/after examples, decision comparisons, timelines, evidence gates, collapsible prerequisites, and copy-ready prompt controls.
+- Updated the Technical Guide Writer skill to choose structures based on the reader’s task instead of defaulting every article to one repeated formula.
+
+### Verification
+
+- Added focused contracts that require one unique format per guide, a matching renderer for every format, and the intended range of reading patterns.
+
 ## 2026-08-18 — Admin workspace controls
 
 ### Added

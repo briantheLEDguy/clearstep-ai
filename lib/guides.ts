@@ -1,5 +1,16 @@
 export type GuideSeries = "AI basics" | "Everyday productivity" | "Work efficiency systems";
 
+export type GuideFormat =
+  | "field-guide"
+  | "prompt-lab"
+  | "four-pass-audit"
+  | "planning-sprint"
+  | "evidence-board"
+  | "message-clinic"
+  | "workflow-canvas"
+  | "codex-runbook"
+  | "improvement-loop";
+
 export type GuideStep = {
   title: string;
   body: string;
@@ -318,11 +329,24 @@ Observations:
 
 const seriesNames: GuideSeries[] = ["AI basics", "Everyday productivity", "Work efficiency systems"];
 
+const guideFormats: Record<string, { format: GuideFormat; formatLabel: string }> = {
+  "ai-is-a-draft-partner": { format: "field-guide", formatLabel: "Field guide" },
+  "write-prompts-that-produce-usable-work": { format: "prompt-lab", formatLabel: "Prompt lab" },
+  "verify-ai-output-before-you-use-it": { format: "four-pass-audit", formatLabel: "Four-pass audit" },
+  "turn-notes-into-a-daily-plan": { format: "planning-sprint", formatLabel: "10-minute sprint" },
+  "summarize-notes-into-actions": { format: "evidence-board", formatLabel: "Evidence board" },
+  "draft-clear-everyday-messages": { format: "message-clinic", formatLabel: "Message clinic" },
+  "build-a-repeatable-workflow-checklist": { format: "workflow-canvas", formatLabel: "Workflow canvas" },
+  "automate-a-small-task-with-codex": { format: "codex-runbook", formatLabel: "Codex runbook" },
+  "create-a-weekly-improvement-loop": { format: "improvement-loop", formatLabel: "7-day loop" },
+};
+
 export const guideSeries = seriesNames.map((title) => ({
   slug: title.toLowerCase().replaceAll(" ", "-"),
   title,
   articles: getGuidesBySeries(title).map((guide) => ({
     ...guide,
+    ...guideFormats[guide.slug],
     time: `${guide.minutes} min`,
     level: guide.difficulty,
     why: guide.whyItWorks,

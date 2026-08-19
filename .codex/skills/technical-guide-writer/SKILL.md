@@ -10,18 +10,18 @@ Create useful, accurate instruction that readers can scan quickly and apply imme
 ## Workflow
 
 1. Define one observable outcome for the article.
-2. State the time, prerequisites, and tool choices up front.
-3. Open with the result and why it matters; omit scene-setting and history unless required.
-4. Break the method into numbered actions. Start each action with a verb.
-5. Supply exact UI labels, commands, or copy-ready prompts where they remove guesswork.
-6. Explain the reason for a step only when it prevents an error or improves judgment.
-7. Add a small verification step so the reader can confirm success.
-8. Close with one next action, not a recap of the entire article.
+2. Choose a structure that matches how the reader needs to think: a walkthrough for sequence, a diagnostic for judgment, a comparison for choices, a lab for experimentation, a teardown for critique, or a canvas for designing a system.
+3. Open with the result, tension, question, or useful example that gives the reader a reason to continue. Omit generic scene-setting and history unless required.
+4. State time, prerequisites, and tool choices where they help the reader commit or avoid a blocked start; they do not need the same visual treatment in every article.
+5. Supply exact UI labels, commands, examples, or copy-ready prompts where they remove guesswork.
+6. Explain the reason for an action only when it prevents an error or improves judgment.
+7. Give the reader an observable way to verify the result.
+8. Close with one useful next action, not a recap of the entire article.
 
 ## Pacing and voice
 
-- Use plain language, short paragraphs, descriptive headings, bullets, and numbered steps.
-- Keep one main idea per paragraph and one action per numbered step.
+- Use plain language, short paragraphs, descriptive headings, bullets, and numbered steps when sequence matters.
+- Keep one main idea per paragraph. Use steps only for actions that genuinely depend on order.
 - Prefer concrete verbs and examples over abstractions.
 - Address the reader as “you.” Sound calm, direct, and capable—not breathless or salesy.
 - Define unfamiliar terms on first use. Avoid unexplained acronyms.
@@ -29,18 +29,25 @@ Create useful, accurate instruction that readers can scan quickly and apply imme
 - Keep caveats next to the relevant action rather than collecting them at the end.
 - Distinguish facts, recommendations, and tool-specific behavior. Do not invent features.
 
-## Article pattern
+## Editorial range
 
-Use this shape unless the subject requires a different one:
+Choose the lightest structure that teaches the subject well. Across a series, vary both the reading rhythm and the way information is organized; do not merely rename the same recurring sections.
 
-1. **Title:** outcome-led and specific.
-2. **Quick read:** estimated time, difficulty, and what the reader will produce.
-3. **Why this works:** two or three sentences at most.
-4. **Steps:** numbered, testable actions.
-5. **Copy this:** prompt, template, command, or checklist in a clearly labeled block.
-6. **Check your result:** two to four observable success criteria.
-7. **Improve it:** one optional refinement.
-8. **Next guide:** the logical follow-on lesson.
+- **Walkthrough:** short setup, ordered actions, checkpoints, finish line. Best for a first successful run.
+- **Diagnostic:** warning signs, focused review passes, decisions, verdict. Best for evaluating existing work.
+- **Comparison:** two or more approaches shown side by side, selection criteria, worked example. Best when readers need judgment rather than a recipe.
+- **Lab:** starting material, one controlled experiment, observation, iteration. Best for prompts and tool behavior.
+- **Teardown:** realistic before example, annotated weaknesses, improved version, principles to reuse. Best for writing and design critique.
+- **Canvas:** inputs, constraints, decisions, owners, and completion conditions. Best for workflows and operating systems.
+
+Most articles still need a specific title, a clear outcome, a usable example or template, a safety note close to the risky action, and a way to verify the result. They do not all need a “why this works” preamble, six steps, a prompt block, a checklist, and an improvement section in the same order.
+
+Within a series:
+
+- Avoid using the same primary structure for consecutive articles.
+- Vary section length and density: mix short callouts, worked examples, compact tables, annotated prompts, and prose where each is strongest.
+- Give recurring safety guidance context-specific wording and placement instead of repeating one generic warning verbatim.
+- Use visual or interactive treatments only when they clarify a relationship, decision, or sequence.
 
 ## AI-tool tutorials
 
@@ -58,7 +65,8 @@ Before publishing, confirm:
 - The opening promises one outcome and the steps deliver it.
 - A beginner can act without hidden prerequisites.
 - Examples are realistic, safe, and ready to adapt.
-- Every step has a clear action and sequence.
+- Ordered steps have a clear action and real sequence; non-sequential material uses a more appropriate structure.
 - Claims about changing products have been verified against current primary documentation.
-- The article can be skimmed by reading only its headings, bold text, and code blocks.
+- The article can be skimmed by reading only its headings, labels, examples, and code blocks.
+- Its structure fits the subject and is not a cosmetic copy of the neighboring article.
 - The final copy is concise without omitting safety or validation.
