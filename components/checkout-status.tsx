@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { trackEvent } from "@/lib/analytics";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 type EnrollmentRecord = {
@@ -89,7 +88,6 @@ export function CheckoutStatus({ checkoutSessionId }: { checkoutSessionId?: stri
               ? `Your place in ${workshopTitle} is confirmed. Joining details are on their way to your inbox.`
               : "Your place is confirmed. Joining details are on their way to your inbox.",
           });
-          void trackEvent("checkout_confirmed");
           return;
         }
 

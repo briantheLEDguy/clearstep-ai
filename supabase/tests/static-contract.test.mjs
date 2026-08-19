@@ -20,6 +20,12 @@ test("runtime hardening and later admin controls have ordered migrations", async
     "20260818130400_seed_clearstep_catalog.sql",
     "20260818130500_runtime_security_hardening.sql",
     "20260818200414_admin_controls.sql",
+    "20260819114628_consent_gated_analytics.sql",
+    "20260819115439_customer_rights_legal_acceptance.sql",
+    "20260819122143_dashboard_overview_action.sql",
+    "20260819123000_admin_cursor_pagination.sql",
+    "20260819125320_strict_anonymous_analytics_schema.sql",
+    "20260819140629_versioned_checkout_legal_acceptance.sql",
   ]);
 });
 
@@ -35,6 +41,7 @@ test("all planned Edge Function slugs exist and public functions disable JWT ver
     "google-oauth-start",
     "google-oauth-callback",
     "automation-worker",
+    "customer-requests",
     "analytics-ingest",
     "auth-send-email-hook",
   ];
@@ -144,6 +151,29 @@ test("database contract has RLS, explicit grants, atomic seats, idempotency, and
   assert.match(migrations, /grant execute on function private\.valid_course_agenda\(jsonb\)[\s\S]*to service_role/u);
   assert.match(migrations, /courses_published_public_outcomes_nonempty/u);
   assert.match(migrations, /courses_published_public_agenda_nonempty/u);
+});
+
+test("checkout legal acceptance preserves an immutable record for each document version", async () => {
+  const original = await read("migrations/20260819115439_customer_rights_legal_acceptance.sql");
+  const versioned = await read("migrations/20260819140629_versioned_checkout_legal_acceptance.sql");
+  const checkout = await read("functions/create-checkout/index.ts");
+  const recorder = versioned.match(
+    /create or replace function public\.record_checkout_legal_acceptance[\s\S]*?\$\$;/u,
+  )?.[0] ?? "";
+
+  assert.match(original, /legal_acceptances_one_document_per_checkout unique \(checkout_id, document_key\)/u);
+  assert.match(
+    versioned,
+    /alter table private\.legal_acceptances\s+drop constraint legal_acceptances_one_document_per_checkout/u,
+  );
+  assert.match(
+    versioned,
+    /add constraint legal_acceptances_one_version_per_checkout\s+unique \(checkout_id, document_key, document_version\)/u,
+  );
+  assert.match(recorder, /on conflict \(checkout_id, document_key, document_version\) do nothing/u);
+  assert.doesNotMatch(recorder, /on conflict \(checkout_id, document_key\) do nothing/u);
+  assert.match(recorder, /if v_inserted > 0 then[\s\S]*'legal\.checkout_acknowledged'/u);
+  assert.match(checkout, /document_version: LEGAL_DOCUMENTS\[key\]\.version/u);
 });
 
 test("course text and list bounds match the server-rendered catalog contract", async () => {
@@ -325,9 +355,10 @@ test("public function request contracts remain stable", async () => {
     assert.match(source, /workshopSlug/u);
     assert.match(source, /sessionRef/u);
   }
-  assert.match(analytics, /eventName/u);
-  assert.match(analytics, /pagePath/u);
-  assert.match(analytics, /properties/u);
+  assert.match(analytics, /action/u);
+  assert.match(analytics, /consentId/u);
+  assert.match(analytics, /sessionId/u);
+  assert.doesNotMatch(analytics, /pagePath|properties/u);
 });
 
 test("private workshop requests consume honeypot and timing controls before database writes", async () => {
@@ -350,54 +381,70 @@ test("private workshop requests consume honeypot and timing controls before data
   assert.match(admin, /delete from private\.private_request_rate_limits[\s\S]*interval '24 hours'/u);
 });
 
-test("privacy-first analytics never persist a raw IP or user agent", async () => {
+test("consent-gated browser analytics never persist a raw IP, user identity, or browsing path", async () => {
   const source = await read("functions/analytics-ingest/index.ts");
   const core = await read("migrations/20260818130000_clearstep_core.sql");
-  const runtime = await read("migrations/20260818130500_runtime_security_hardening.sql");
-  assert.match(source, /requireUuid\(body\.anonymousId, "anonymousId"\)/u);
-  assert.doesNotMatch(source, /user-agent|ANALYTICS_HASH_SALT/u);
+  const consent = await read("migrations/20260819114628_consent_gated_analytics.sql");
+  const strictSchema = await read("migrations/20260819125320_strict_anonymous_analytics_schema.sql");
+  assert.match(source, /requireUuid\(body\.consentId, "consentId"\)/u);
+  assert.match(source, /requireUuid\(body\.sessionId, "sessionId"\)/u);
+  assert.doesNotMatch(source, /optionalUserId|user-agent|ANALYTICS_HASH_SALT|pagePath|referrer|properties/u);
   assert.match(source, /hmacSha256Hex[\s\S]*RATE_LIMIT_HASH_SALT/u);
   assert.match(source, /allowedEvents\.has\(body\.eventName\)/u);
   assert.match(source, /rateLimitWindowMs = 10 \* 60 \* 1_000/u);
-  assert.match(source, /p_abuse_hash: abuseHash/u);
-  assert.match(source, /eventPropertyKeys/u);
-  assert.match(source, /checkout_confirmed: new Set\(\)/u);
-  assert.match(source, /sanitizeAnalyticsProperties\(body\.eventName/u);
-  assert.doesNotMatch(source, /"checkout_started"/u);
-  assert.doesNotMatch(runtime, /'checkout_started'/u);
-  for (const eventName of [
-    "page_view",
-    "course_view",
-    "cta_private_workshop",
-    "cta_workshops",
-    "cta_private_request",
-    "cta_workshop_detail",
-    "waitlist_started",
-    "checkout_confirmed",
-    "private_quote_checkout_started",
-    "waitlist_offer_checkout_started",
-  ]) {
-    assert.match(source, new RegExp(`"${eventName}"`, "u"));
-    assert.match(runtime, new RegExp(`'${eventName}'`, "u"));
-  }
+  assert.match(source, /p_abuse_hash: await abuseHash\(req, "event"\)/u);
+  assert.match(source, /analytics_consent_active/u);
+  assert.ok(source.indexOf('"analytics_consent_active"') < source.indexOf('p_abuse_hash: await abuseHash(req, "event")'));
+  assert.match(source, /new Set\(\["page_view", "course_view"\]\)/u);
+  assert.match(source, /withSupabase\(\{ auth: "publishable" \}/u);
   const analyticsTable = core.match(/create table private\.analytics_events \([\s\S]*?\n\);/u)?.[0] ?? "";
   assert.match(analyticsTable, /anonymous_id uuid/u);
   assert.doesNotMatch(analyticsTable, /request_fingerprint|abuse_hash|ip_address|user_agent/u);
-  const finalIngest = runtime.match(/create or replace function public\.ingest_analytics_event[\s\S]*?\$\$;/u)?.[0] ?? "";
+  assert.match(consent, /create table private\.analytics_consents/u);
+  assert.match(consent, /add column consent_id uuid references private\.analytics_consents/u);
+  assert.match(consent, /analytics_consent_events_anonymous/u);
+  assert.match(consent, /alter column consent_id set not null/u);
+  assert.match(consent, /pg_get_functiondef\(v_procedure::oid\)/u);
+  assert.match(consent, /regexp_replace\(/u);
+  for (const legacyWriter of [
+    "create_checkout_hold",
+    "join_session_waitlist",
+    "submit_private_workshop_request",
+    "process_stripe_event",
+    "staff_admin_action",
+    "run_booking_maintenance",
+  ]) {
+    assert.match(consent, new RegExp(`'${legacyWriter}'`, "u"));
+  }
+  assert.match(consent, /legacy_analytics_writer_not_removed/u);
+  assert.match(consent, /legacy_analytics_writer_remaining/u);
+  assert.match(consent, /legacy_analytics_writer_missing/u);
+  for (const forbiddenColumn of [
+    "user_id",
+    "page_path",
+    "referrer",
+    "utm_medium",
+    "utm_campaign",
+    "properties",
+  ]) {
+    assert.match(strictSchema, new RegExp(`drop column ${forbiddenColumn}`, "u"));
+  }
+  assert.match(strictSchema, /add column course_id uuid references public\.courses\(id\)/u);
+  assert.match(strictSchema, /drop column unique_users/u);
+  const finalIngest = strictSchema.match(/create or replace function public\.ingest_analytics_event[\s\S]*?\$\$;/u)?.[0] ?? "";
   const analyticsInsert = finalIngest.match(/insert into private\.analytics_events[\s\S]*?returning id into v_event_id/u)?.[0] ?? "";
   assert.doesNotMatch(analyticsInsert, /abuse_hash/u);
-  assert.match(runtime, /create table private\.analytics_rate_limits/u);
-  assert.match(runtime, /if v_rate_count > 120/u);
-  assert.match(runtime, /delete from private\.analytics_rate_limits[\s\S]*expires_at <= now\(\)/u);
+  assert.doesNotMatch(analyticsInsert, /user_id|page_path|referrer|utm_medium|utm_campaign|properties/u);
+  assert.match(analyticsInsert, /course_id/u);
+  assert.doesNotMatch(finalIngest, /p_user_id|p_page_path|p_referrer|p_properties/u);
+  assert.match(finalIngest, /if not public\.analytics_consent_active\(p_consent_id\)/u);
+  assert.match(consent, /if v_rate_count > 120/u);
+  assert.match(consent, /delete from private\.analytics_events[\s\S]*where consent_id = p_consent_id/u);
+  assert.match(consent, /distinct_consent_count/u);
+  assert.match(consent, /having count\(distinct ae\.consent_id\) >= 20/u);
+  assert.match(consent, /interval '30 days'/u);
+  assert.match(consent, /interval '12 months'/u);
   assert.doesNotMatch(finalIngest, /'checkout_started'/u);
-  assert.match(finalIngest, /v_properties - v_allowed_property_keys <> '\{\}'::jsonb/u);
-  assert.match(finalIngest, /jsonb_typeof\(property\.value\) <> 'string'/u);
-  assert.match(source, /sameOriginPathname/u);
-  assert.match(source, /p_page_path: pagePath/u);
-  assert.match(source, /p_referrer: referrerPath/u);
-  assert.match(source, /sensitiveQueryParameter/u);
-  assert.match(source, /sensitivePropertyKey/u);
-  assert.doesNotMatch(source, /p_referrer:\s*req\.headers\.get\("referer"\)/u);
 });
 
 test("team, waitlist, and operations actions enforce the planned role boundary", async () => {
@@ -463,6 +510,8 @@ test("historical analytics combine retained daily rollups with recent raw events
   const operations = await read("migrations/20260818130050_operations_schema.sql");
   const admin = await read("migrations/20260818130200_admin_analytics_automation.sql");
   const runtime = await read("migrations/20260818130500_runtime_security_hardening.sql");
+  const consent = await read("migrations/20260819114628_consent_gated_analytics.sql");
+  const strictSchema = await read("migrations/20260819125320_strict_anonymous_analytics_schema.sql");
   const rollup = operations.match(/create or replace function public\.rollup_and_retain_analytics[\s\S]*?\$\$;/u)?.[0] ?? "";
   assert.match(operations, /dimension text not null default ''/u);
   assert.match(operations, /primary key \(day, event_name, dimension\)/u);
@@ -490,6 +539,15 @@ test("historical analytics combine retained daily rollups with recent raw events
   assert.match(admin, /'automation_failures',[\s\S]*private\.automation_jobs[\s\S]*status = 'failed'/u);
   assert.match(admin, /v_analytics_retention_start[\s\S]*interval '24 months'/u);
   assert.doesNotMatch(admin, /v_to - v_from > interval '366 days'/u);
+  const consentRollup = consent.match(/create or replace function public\.rollup_and_retain_analytics[\s\S]*?\$\$;/u)?.[0] ?? "";
+  assert.equal((consentRollup.match(/having count\(distinct ae\.consent_id\) >= 20/gu) ?? []).length, 3);
+  assert.match(consentRollup, /::date - 29/u);
+  assert.match(consentRollup, /interval '30 days'/u);
+  assert.match(consentRollup, /interval '12 months'/u);
+  const strictRollup = strictSchema.match(/create or replace function public\.rollup_and_retain_analytics[\s\S]*?\$\$;/u)?.[0] ?? "";
+  assert.equal((strictRollup.match(/having count\(distinct analytics_event\.consent_id\) >= 20/gu) ?? []).length, 3);
+  assert.match(strictRollup, /course\.id = analytics_event\.course_id/u);
+  assert.doesNotMatch(strictRollup, /unique_users|properties/u);
 });
 
 test("foreign-key columns used by operational joins are indexed", async () => {
@@ -721,7 +779,7 @@ test("Google credentials use Vault and Gmail distinguishes safe rejection retrie
   const crypto = await read("functions/_shared/crypto.ts");
   const worker = await read("functions/automation-worker/index.ts");
   const adminEdge = await read("functions/admin-catalog/index.ts");
-  const adminUi = await readFile(path.join(projectRoot, "components", "admin", "AdminDashboard.tsx"), "utf8");
+  const adminUi = await readFile(path.join(projectRoot, "components", "admin", "AdminSections.tsx"), "utf8");
   const runtime = await read("migrations/20260818130500_runtime_security_hardening.sql");
   const rootEnv = await readFile(path.join(projectRoot, ".env.example"), "utf8");
   const backendEnv = await read(".env.example");

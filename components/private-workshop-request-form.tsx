@@ -3,6 +3,7 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { functionErrorMessage, unwrapFunctionData } from "@/lib/supabase/functions";
+import { COMPANY_DETAILS } from "@/shared/company-details";
 
 type RequestResult = {
   request_id?: unknown;
@@ -30,7 +31,7 @@ export function PrivateWorkshopRequestForm() {
 
     if (!client) {
       setState("unconfigured");
-      setMessage("The online request form is still being connected. You can email Brian directly and we’ll help plan your session.");
+      setMessage("The online request form is still being connected. You can email us directly and we’ll help plan your session.");
       return;
     }
 
@@ -61,14 +62,14 @@ export function PrivateWorkshopRequestForm() {
 
       if (error) {
         setState("error");
-        setMessage(await functionErrorMessage(error, "We couldn’t send your request. Please try again or email Brian for help."));
+        setMessage(await functionErrorMessage(error, "We couldn’t send your request. Please try again or email us for help."));
         return;
       }
 
       const result = unwrapFunctionData<RequestResult>(data);
       if (!result || typeof result.request_id !== "string") {
         setState("error");
-        setMessage("We couldn’t confirm that your request was received. Please try again or email Brian for help.");
+      setMessage("We couldn’t confirm that your request was received. Please try again or email us for help.");
         return;
       }
 
@@ -77,7 +78,7 @@ export function PrivateWorkshopRequestForm() {
       setMessage("Thanks — your request is in. We’ll review what you shared and reply with a clear recommendation for the session.");
     } catch (error) {
       setState("error");
-      setMessage(await functionErrorMessage(error, "We couldn’t send your request. Please try again or email Brian for help."));
+    setMessage(await functionErrorMessage(error, "We couldn’t send your request. Please try again or email us for help."));
     }
   }
 
@@ -147,13 +148,14 @@ export function PrivateWorkshopRequestForm() {
 
       <div className="mt-6">
         <label className={labelClassName} htmlFor="private-goals">What should your team be able to do afterwards?</label>
+        <p className="mb-3 text-sm text-[color:rgba(16,42,67,.68)]">Please do not include special-category personal data, passwords, confidential client information, or other secrets.</p>
         <textarea
           className={fieldClassName}
           id="private-goals"
           name="goals"
           rows={5}
           minLength={10}
-          maxLength={5000}
+          maxLength={2000}
           placeholder="Tell us about the recurring work, questions, or confidence gaps you want the session to address."
           required
         />
@@ -161,7 +163,7 @@ export function PrivateWorkshopRequestForm() {
 
       <div className="mt-6">
         <label className={labelClassName} htmlFor="private-notes">Anything else we should know? <span className="font-normal text-[color:rgba(16,42,67,.62)]">(optional)</span></label>
-        <textarea className={fieldClassName} id="private-notes" name="notes" rows={4} maxLength={5000} />
+        <textarea className={fieldClassName} id="private-notes" name="notes" rows={4} maxLength={1000} />
       </div>
 
       <div className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">
@@ -190,7 +192,7 @@ export function PrivateWorkshopRequestForm() {
       ) : null}
 
       <p className="mb-0 mt-5 text-center text-sm text-[color:rgba(16,42,67,.68)]">
-        If the form is unavailable, <a className="font-bold text-[var(--action)] underline underline-offset-3" href="mailto:brian@bncconsulting.co?subject=Private%20Clearstep%20workshop">email Brian directly</a>.
+        If the form is unavailable, <a className="font-bold text-[var(--action)] underline underline-offset-3" href={`mailto:${COMPANY_DETAILS.email}?subject=Private%20Clearstep%20workshop`}>email us directly</a>.
       </p>
     </form>
   );

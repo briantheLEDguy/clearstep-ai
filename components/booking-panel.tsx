@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { trackEvent } from "@/lib/analytics";
+import { CheckoutLegalAcceptance } from "@/components/checkout-legal-acceptance";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { functionErrorMessage, unwrapFunctionData } from "@/lib/supabase/functions";
+import { COMPANY_DETAILS } from "@/shared/company-details";
 
 type BookingPanelProps = {
   workshopSlug: string;
@@ -18,13 +19,20 @@ export function BookingPanel({ workshopSlug, workshopTitle, sessionId, seatsLeft
   const router = useRouter();
   const [state, setState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [legalAccepted, setLegalAccepted] = useState(false);
   const soldOut = seatsLeft < 1;
 
   async function continueToBooking() {
+    if (!soldOut && !legalAccepted) {
+      setState("error");
+      setMessage("Please read and accept the Terms and Cancellation policy before opening checkout.");
+      return;
+    }
+
     const client = getSupabaseBrowserClient();
     if (!client) {
       setState("error");
-      setMessage("Online booking is being connected. Please email Brian and we’ll help reserve your place.");
+      setMessage("Online booking is being connected. Please email us and we’ll help reserve your place.");
       return;
     }
 
@@ -38,18 +46,16 @@ export function BookingPanel({ workshopSlug, workshopTitle, sessionId, seatsLeft
       return;
     }
 
-    if (soldOut) {
-      void trackEvent("waitlist_started", { workshop_slug: workshopSlug });
-    }
-
     const functionName = soldOut ? "join-waitlist" : "create-checkout";
     const { data, error } = await client.functions.invoke(functionName, {
-      body: { workshopSlug, sessionRef: sessionId },
+      body: soldOut
+        ? { workshopSlug, sessionRef: sessionId }
+        : { workshopSlug, sessionRef: sessionId, legalAccepted: true },
     });
 
     if (error) {
       setState("error");
-      setMessage(await functionErrorMessage(error, "Something went wrong. Please try again or email Brian for help."));
+      setMessage(await functionErrorMessage(error, "Something went wrong. Please try again or email us for help."));
       return;
     }
 
@@ -85,10 +91,13 @@ export function BookingPanel({ workshopSlug, workshopTitle, sessionId, seatsLeft
       <p className="my-6 border-y border-white/15 py-5 font-semibold">
         {soldOut ? "This session is currently full." : `${seatsLeft} ${seatsLeft === 1 ? "place" : "places"} available`}
       </p>
+      {!soldOut ? (
+        <CheckoutLegalAcceptance checked={legalAccepted} onChange={setLegalAccepted} tone="dark" />
+      ) : null}
       <button
         className="button w-full border-0 bg-[var(--yellow)] text-[var(--navy)] enabled:cursor-pointer disabled:cursor-wait disabled:opacity-65"
         type="button"
-        disabled={state === "loading" || state === "success"}
+        disabled={state === "loading" || state === "success" || (!soldOut && !legalAccepted)}
         onClick={continueToBooking}
       >
         {state === "loading" ? "One moment…" : soldOut ? "Join the waitlist" : "Continue to secure checkout"}
@@ -105,7 +114,7 @@ export function BookingPanel({ workshopSlug, workshopTitle, sessionId, seatsLeft
       <p className="mb-0 mt-5 text-sm text-white/70">
         Booking is tied to your Clearstep account. New here? We’ll help you sign in first.
       </p>
-      <a className="mt-4 inline-block text-sm font-bold text-[var(--mint)] underline underline-offset-4" href={`mailto:brian@bncconsulting.co?subject=${encodeURIComponent(`Question about ${workshopTitle}`)}`}>
+      <a className="mt-4 inline-block text-sm font-bold text-[var(--mint)] underline underline-offset-4" href={`mailto:${COMPANY_DETAILS.email}?subject=${encodeURIComponent(`Question about ${workshopTitle}`)}`}>
         Ask a question before booking
       </a>
     </aside>

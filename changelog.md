@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026-08-19 — Public company information
+
+### Changed
+
+- Replaced the environment-driven public policy gate with static public company contact and complaints information; retained checkout document-version acknowledgement and human-reviewed customer requests.
+
+## 2026-08-19 — Governance, accessibility, and repository hygiene
+
+### Added
+
+- Added repository contributor/agent rules, a responsible vulnerability-reporting policy, a proprietary licence notice, and a concise compliance/accessibility release-evidence guide.
+- Added a versioned checkout acknowledgement model, authenticated customer-rights/cancellation request intake, and an explicit retention-review register.
+
+### Changed
+
+- Rewrote the root and Supabase runbooks around the current static-export/Supabase boundary, immutable migration policy, configuration separation, provider verification, and public-release gates.
+- Documented the consent-gated analytics model: explicit opt-in, opaque consent and per-tab identifiers, immediate withdrawal/raw-event deletion, 30-day raw retention, and 12-month k=20 aggregate reporting.
+- Tightened the analytics schema itself by removing dormant account, route, referrer, campaign, and arbitrary-JSON columns; course views now use a direct first-party course identifier.
+- Added Chromium/Axe browser checks and a disposable Supabase pgTAP suite to the continuous-integration release evidence.
+- Split the staff workspace into role-filtered static routes with lazy detail loading, bounded cursor pages for high-volume detail views, and a protected aggregate-only overview action.
+- Recorded that GitHub Pages cannot enforce application-defined security headers; the hosting/CSP decision remains an explicit release gate.
+- Updated FAQ answers to align confirmation, transfer, and accessibility-arrangement copy with the current customer flow and cancellation policy.
+- Removed the stale hard-coded sitemap `lastModified` value rather than publishing a date unrelated to an individual route.
+- Clarified the local Supabase Edge Function environment template and replaced organization-specific/example values with safe test placeholders.
+
+### Removed
+
+- Removed an unused legacy ChatGPT-header authentication helper, an unused guide lookup export, and four unreferenced starter SVG assets.
+
 ## 2026-08-19 — Dynamic Guides reading experience
 
 ### Changed

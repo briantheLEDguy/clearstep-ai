@@ -25,8 +25,8 @@ export default async function Home() {
             No jargon, no overwhelm—just guided practice you can use today.
           </p>
           <div className="hero-actions">
-            <Link className="button button-primary" href="/workshops" data-analytics-event="cta_workshops">Find a workshop</Link>
-            <Link className="text-link" href="/private-workshops" data-analytics-event="cta_private_workshop">Plan a private session <span aria-hidden="true">→</span></Link>
+            <Link className="button button-primary" href="/workshops">Find a workshop</Link>
+            <Link className="text-link" href="/private-workshops">Plan a private session <span aria-hidden="true">→</span></Link>
           </div>
           <ul className="trust-list" aria-label="Workshop benefits">
             <li>No technical experience needed</li>

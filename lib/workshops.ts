@@ -1,3 +1,12 @@
+import {
+  isWorkshopSessionId,
+  isWorkshopSlug,
+  parseWorkshopRouteSegment,
+} from "./workshop-route";
+
+export { parseWorkshopRouteSegment, workshopRouteSegment } from "./workshop-route";
+export type { WorkshopRoute } from "./workshop-route";
+
 export type WorkshopFormat = "In person" | "Live online" | "Hybrid";
 export type WorkshopStatus = "scheduled" | "sold_out";
 
@@ -36,8 +45,6 @@ export type WorkshopCatalog =
 
 type JsonRecord = Record<string, unknown>;
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const SUPABASE_RPC_PATH = "/rest/v1/rpc/public_workshop_catalog";
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -156,9 +163,9 @@ function mapWorkshop(value: unknown): Workshop | null {
   const status = value.status === "scheduled" || value.status === "sold_out" ? value.status : null;
 
   if (
-    !courseId || !UUID_PATTERN.test(courseId)
-    || !sessionId || !UUID_PATTERN.test(sessionId)
-    || !slug || !SLUG_PATTERN.test(slug)
+    !courseId || !isWorkshopSessionId(courseId)
+    || !sessionId || !isWorkshopSessionId(sessionId)
+    || !slug || !isWorkshopSlug(slug)
     || !title || !summary || !description || !outcomes || !level || !audience || !agenda
     || !durationMinutes || !priceCents || value.currency !== "EUR" || !format
     || !startsAt || !endsAt || Date.parse(startsAt) >= Date.parse(endsAt) || !timezone
@@ -253,7 +260,7 @@ export function getWorkshopCatalog() {
 
 export async function getWorkshop(slug: string, sessionId?: string) {
   const catalog = await getWorkshopCatalog();
-  const safeSessionId = sessionId && UUID_PATTERN.test(sessionId) ? sessionId : undefined;
+  const safeSessionId = sessionId && isWorkshopSessionId(sessionId) ? sessionId : undefined;
   return {
     catalogStatus: catalog.status,
     workshop: catalog.workshops.find((item) =>
@@ -262,17 +269,10 @@ export async function getWorkshop(slug: string, sessionId?: string) {
   };
 }
 
-export function workshopRouteSegment(workshop: Pick<Workshop, "slug" | "sessionId">) {
-  return `${workshop.slug}--${workshop.sessionId}`;
-}
-
 export async function getWorkshopByRouteSegment(routeSegment: string) {
-  const separatorIndex = routeSegment.lastIndexOf("--");
-  if (separatorIndex < 1) return getWorkshop(routeSegment);
-
-  const slug = routeSegment.slice(0, separatorIndex);
-  const sessionId = routeSegment.slice(separatorIndex + 2);
-  return getWorkshop(slug, sessionId);
+  const route = parseWorkshopRouteSegment(routeSegment);
+  if (!route) return getWorkshop("");
+  return getWorkshop(route.slug, route.sessionId);
 }
 
 export function formatWorkshopDate(workshop: Workshop) {

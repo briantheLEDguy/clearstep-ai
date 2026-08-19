@@ -72,8 +72,9 @@ test("the public frontend contains no hardcoded catalog inventory", async () => 
 });
 
 test("every exported workshop URL stays bound to its session", async () => {
-  const [catalog, card, detail, booking, sitemap] = await Promise.all([
+  const [catalog, route, card, detail, booking, sitemap] = await Promise.all([
     source("../lib/workshops.ts"),
+    source("../lib/workshop-route.ts"),
     source("../components/workshop-card.tsx"),
     source("../app/workshops/[slug]/page.tsx"),
     source("../components/booking-panel.tsx"),
@@ -82,7 +83,8 @@ test("every exported workshop URL stays bound to its session", async () => {
 
   assert.match(card, /workshopRouteSegment\(workshop\)/u);
   assert.match(catalog, /item\.slug\s*===\s*slug[\s\S]*item\.sessionId\s*===\s*safeSessionId/u);
-  assert.match(catalog, /`\$\{workshop\.slug\}--\$\{workshop\.sessionId\}`/u);
+  assert.match(route, /`\$\{workshop\.slug\}--\$\{workshop\.sessionId\}`/u);
+  assert.match(route, /parseWorkshopRouteSegment/u);
   assert.match(detail, /getWorkshopByRouteSegment\(slug\)/u);
   assert.match(detail, /generateStaticParams/u);
   assert.match(booking, /`\/workshops\/\$\{workshopSlug\}--\$\{sessionId\}`/u);

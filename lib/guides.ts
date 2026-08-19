@@ -354,10 +354,6 @@ export const guideSeries = seriesNames.map((title) => ({
   })),
 }));
 
-export function getGuide(slug: string) {
-  return guides.find((guide) => guide.slug === slug);
-}
-
 export function getGuidesBySeries(series: GuideSeries) {
   return guides.filter((guide) => guide.series === series).sort((left, right) => left.order - right.order);
 }

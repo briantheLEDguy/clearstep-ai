@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { serializeJsonLd } from "@/lib/json-ld";
 import { getSiteOrigin } from "@/lib/site-origin";
+import { COMPANY_DETAILS } from "@/shared/company-details";
 import "./globals.css";
 
 const manrope = localFont({
@@ -61,9 +62,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "Clearstep AI",
+    legalName: COMPANY_DETAILS.name,
     url: origin,
     logo: `${origin}/primary-logo.png`,
-    email: "brian@bncconsulting.co",
+    email: COMPANY_DETAILS.email,
+    telephone: COMPANY_DETAILS.phone,
     description: "Practical AI workshops for freelancers and small businesses.",
   };
 

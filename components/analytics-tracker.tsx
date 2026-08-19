@@ -2,43 +2,38 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { useAnalyticsConsent } from "@/components/analytics-consent";
 import { trackEvent } from "@/lib/analytics";
+import { parseWorkshopRouteSegment } from "@/lib/workshop-route";
 
 function campaignProperties() {
   const params = new URLSearchParams(window.location.search);
   const properties: Record<string, string> = {};
-  for (const key of ["utm_source", "utm_medium", "utm_campaign"] as const) {
+  for (const key of ["utm_source"] as const) {
     const value = params.get(key)?.trim();
-    if (value) properties[key] = value.slice(0, 200);
+    if (value && /^[a-z0-9][a-z0-9_-]{0,63}$/iu.test(value)) properties[key] = value.toLowerCase();
   }
   return properties;
 }
 
 export function AnalyticsTracker() {
+  const { enabled } = useAnalyticsConsent();
+
+  return enabled ? <EnabledAnalyticsTracker /> : null;
+}
+
+function EnabledAnalyticsTracker() {
   const pathname = usePathname();
 
   useEffect(() => {
     const properties = campaignProperties();
     void trackEvent("page_view", properties);
 
-    const workshopMatch = pathname.match(/^\/workshops\/([a-z0-9-]+)$/u);
-    if (workshopMatch) {
-      void trackEvent("course_view", { ...properties, course_slug: workshopMatch[1] });
+    const routeSegment = pathname.match(/^\/workshops\/([^/]+)$/u)?.[1];
+    const workshopRoute = routeSegment ? parseWorkshopRouteSegment(routeSegment) : null;
+    if (workshopRoute) {
+      void trackEvent("course_view", { ...properties, course_slug: workshopRoute.slug });
     }
-
-    function trackClick(event: MouseEvent) {
-      const target = event.target instanceof Element
-        ? event.target.closest<HTMLElement>("[data-analytics-event]")
-        : null;
-      const eventName = target?.dataset.analyticsEvent;
-      if (!eventName || !/^[a-z][a-z0-9_]{1,63}$/u.test(eventName)) return;
-
-      const href = target instanceof HTMLAnchorElement ? target.getAttribute("href") : null;
-      void trackEvent(eventName, href?.startsWith("/") ? { target_path: href } : {});
-    }
-
-    document.addEventListener("click", trackClick);
-    return () => document.removeEventListener("click", trackClick);
   }, [pathname]);
 
   return null;

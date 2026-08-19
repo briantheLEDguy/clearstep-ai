@@ -125,7 +125,7 @@ export function operationalEmail(
     }
     case "private_request_admin_alert": {
       const subject = `New private workshop request: ${payload.organization}`;
-      const text = `${payload.contact_name} (${payload.email}) requested a private workshop for ${payload.attendee_count ?? "an unspecified number of"} attendees. Goals: ${payload.goals}`;
+      const text = `${payload.contact_name} (${payload.email}) requested a private workshop for ${payload.attendee_count ?? "an unspecified number of"} attendees. Request reference: ${payload.request_id}. Review the authorised request record in the staff workspace; this alert intentionally excludes free-text goals and notes.`;
       return { to: target, subject, text, html: frame(subject, `<p>${escapeHtml(text)}</p>`) };
     }
     case "private_quote": {

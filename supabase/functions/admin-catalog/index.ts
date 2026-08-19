@@ -17,8 +17,11 @@ const actions = new Set([
   "session_upsert",
   "private_requests_list",
   "private_request_update",
+  "private_request_quotes_page",
   "quote_create",
   "quote_send",
+  "dashboard_overview",
+  "staff_list_page",
   "analytics_summary",
   "enrollments_list",
   "google_connection_status",
@@ -36,6 +39,9 @@ const actions = new Set([
   "automation_job_cancel",
   "automation_job_rerun",
   "email_delivery_reconcile",
+  "customer_requests_list",
+  "customer_request_update",
+  "retention_review_status",
   "audit_list",
 ]);
 
@@ -48,6 +54,79 @@ type CoursePricingContext = {
   stripe_product_id: string | null;
   stripe_price_id: string | null;
 };
+
+const pagedResources = new Set([
+  "enrollments",
+  "waitlist",
+  "private_requests",
+  "customer_requests",
+  "audit",
+  "automation",
+]);
+
+function staffPagePayload(payload: Record<string, unknown>) {
+  const resource = typeof payload.resource === "string" ? payload.resource : "";
+  if (!pagedResources.has(resource)) {
+    throw new ApiError("invalid_staff_page", "Choose a valid staff resource page.");
+  }
+
+  const limit = payload.limit === undefined ? 50 : Number(payload.limit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new ApiError("invalid_staff_page", "limit must be a whole number between 1 and 100.");
+  }
+
+  if (payload.cursor === undefined || payload.cursor === null) {
+    return { resource, limit, cursorAt: null, cursorId: null };
+  }
+  if (typeof payload.cursor !== "object" || Array.isArray(payload.cursor)) {
+    throw new ApiError("invalid_staff_page", "cursor must be an object.");
+  }
+  const cursor = payload.cursor as Record<string, unknown>;
+  const cursorAt = typeof cursor.at === "string" ? cursor.at.trim() : "";
+  if (!cursorAt || cursorAt.length > 64 || Number.isNaN(Date.parse(cursorAt))) {
+    throw new ApiError("invalid_staff_page", "cursor.at must be a valid timestamp.");
+  }
+  const cursorId = typeof cursor.id === "string" ? cursor.id.trim() : "";
+  if (resource === "audit") {
+    if (!/^\d+$/u.test(cursorId)) {
+      throw new ApiError("invalid_staff_page", "cursor.id must be an audit record identifier.");
+    }
+  } else {
+    requireUuid(cursorId, "cursor.id");
+  }
+  return {
+    resource,
+    limit,
+    cursorAt,
+    cursorId,
+  };
+}
+
+function privateRequestQuotesPagePayload(payload: Record<string, unknown>) {
+  const requestId = requireUuid(payload.request_id, "request_id");
+  const limit = payload.limit === undefined ? 20 : Number(payload.limit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new ApiError("invalid_private_request_quotes_page", "limit must be a whole number between 1 and 100.");
+  }
+
+  if (payload.cursor === undefined || payload.cursor === null) {
+    return { requestId, limit, cursorAt: null, cursorId: null };
+  }
+  if (typeof payload.cursor !== "object" || Array.isArray(payload.cursor)) {
+    throw new ApiError("invalid_private_request_quotes_page", "cursor must be an object.");
+  }
+  const cursor = payload.cursor as Record<string, unknown>;
+  const cursorAt = typeof cursor.at === "string" ? cursor.at.trim() : "";
+  if (!cursorAt || cursorAt.length > 64 || Number.isNaN(Date.parse(cursorAt))) {
+    throw new ApiError("invalid_private_request_quotes_page", "cursor.at must be a valid timestamp.");
+  }
+  return {
+    requestId,
+    limit,
+    cursorAt,
+    cursorId: requireUuid(cursor.id, "cursor.id"),
+  };
+}
 
 function boundedText(value: unknown, maximum: number) {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= maximum;
@@ -249,6 +328,71 @@ export default {
           p_job_id: payload.job_id,
         });
         return ok(result);
+      }
+
+      if (body.action === "staff_list_page") {
+        const page = staffPagePayload(payload);
+        return ok(await rpc(ctx.supabaseAdmin, "list_staff_page", {
+          p_actor_user_id: user.id,
+          p_resource: page.resource,
+          p_cursor_at: page.cursorAt,
+          p_cursor_id: page.cursorId,
+          p_limit: page.limit,
+        }));
+      }
+
+      if (body.action === "private_request_quotes_page") {
+        const page = privateRequestQuotesPagePayload(payload);
+        return ok(await rpc(ctx.supabaseAdmin, "list_private_request_quotes_page", {
+          p_actor_user_id: user.id,
+          p_request_id: page.requestId,
+          p_cursor_at: page.cursorAt,
+          p_cursor_id: page.cursorId,
+          p_limit: page.limit,
+        }));
+      }
+
+      if (body.action === "dashboard_overview") {
+        return ok(await rpc(ctx.supabaseAdmin, "dashboard_overview", {
+          p_actor_user_id: user.id,
+        }));
+      }
+
+      if (body.action === "customer_requests_list") {
+        return ok(await rpc(ctx.supabaseAdmin, "list_customer_requests_for_staff", {
+          p_actor_user_id: user.id,
+        }));
+      }
+
+      if (body.action === "customer_request_update") {
+        const requestId = requireUuid(payload.request_id, "request_id");
+        const status = typeof payload.status === "string" ? payload.status : "";
+        if (![
+          "submitted",
+          "in_review",
+          "awaiting_customer",
+          "completed",
+          "declined",
+        ].includes(status)) {
+          throw new ApiError("invalid_customer_request_update", "Choose a valid customer request status.");
+        }
+        const resolutionNote = payload.resolution_note === undefined || payload.resolution_note === null || payload.resolution_note === ""
+          ? null
+          : typeof payload.resolution_note === "string" && payload.resolution_note.trim().length <= 1_000
+            ? payload.resolution_note.trim()
+            : (() => { throw new ApiError("invalid_customer_request_update", "resolution_note must be 1000 characters or fewer."); })();
+        return ok(await rpc(ctx.supabaseAdmin, "update_customer_request", {
+          p_actor_user_id: user.id,
+          p_request_id: requestId,
+          p_status: status,
+          p_resolution_note: resolutionNote,
+        }));
+      }
+
+      if (body.action === "retention_review_status") {
+        return ok(await rpc(ctx.supabaseAdmin, "retention_review_status", {
+          p_actor_user_id: user.id,
+        }));
       }
 
       if (body.action === "automation_job_cancel") {
