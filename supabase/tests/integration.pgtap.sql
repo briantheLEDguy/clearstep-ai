@@ -6,7 +6,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(56);
+select plan(113);
 
 -- Fixed fixture identities make the role and ownership assertions readable.
 insert into auth.users (id, email, email_confirmed_at)
@@ -18,12 +18,14 @@ values
   ('10000000-0000-4000-8000-000000000005', 'integration-waitlist@example.test', now()),
   ('10000000-0000-4000-8000-000000000006', 'integration-quote-owner@example.test', now()),
   ('10000000-0000-4000-8000-000000000007', 'integration-quote-outsider@example.test', now()),
-  ('10000000-0000-4000-8000-000000000008', 'integration-seat-filler@example.test', now());
+  ('10000000-0000-4000-8000-000000000008', 'integration-seat-filler@example.test', now()),
+  ('10000000-0000-4000-8000-000000000009', 'integration-analyst@example.test', now());
 
 insert into private.staff_members (user_id, email, role, status, activated_at)
 values
   ('10000000-0000-4000-8000-000000000001', 'integration-owner@example.test', 'owner', 'active', now()),
-  ('10000000-0000-4000-8000-000000000002', 'integration-admin@example.test', 'admin', 'active', now());
+  ('10000000-0000-4000-8000-000000000002', 'integration-admin@example.test', 'admin', 'active', now()),
+  ('10000000-0000-4000-8000-000000000009', 'integration-analyst@example.test', 'analyst', 'active', now());
 
 insert into public.courses (
   id, slug, title, summary, description, outcomes, level, audience, agenda,
@@ -171,6 +173,20 @@ select throws_ok(
   'P0001',
   'session_full',
   'a second customer cannot receive the capacity-one checkout hold'
+);
+select throws_ok(
+  $$update private.checkout_attempts
+    set grace_expires_at = (
+      select start_at + interval '1 second'
+      from public.workshop_sessions
+      where id = '30000000-0000-4000-8000-000000000001'::uuid
+    )
+    where checkout_kind = 'workshop'
+      and session_id = '30000000-0000-4000-8000-000000000001'::uuid
+      and user_id = '10000000-0000-4000-8000-000000000003'::uuid$$,
+  '23514',
+  'checkout_must_settle_by_session_start',
+  'a workshop checkout still cannot settle after its session starts'
 );
 
 select is(
@@ -756,6 +772,666 @@ select ok(
   public.retention_review_status('10000000-0000-4000-8000-000000000001')
     -> 'pending_categories' ? 'bookings_payments',
   'the retention registry exposes unresolved transactional-retention approval as pending'
+);
+
+-- BNC service commerce keeps Plate & Post packages separate from Clearstep
+-- workshops while reusing the same authenticated checkout and staff boundary.
+select is(
+  (select string_agg(id, ',' order by id) from public.service_lines),
+  'clearstep,plate_and_post',
+  'service lines use the stable Clearstep and Plate & Post identities'
+);
+select is(
+  (select count(*) from public.courses where service_line_id <> 'clearstep'),
+  0::bigint,
+  'all workshop courses remain explicitly associated with Clearstep'
+);
+select is(
+  (select count(*) from public.service_offerings where service_line_id = 'plate_and_post'),
+  3::bigint,
+  'the migration seeds three distinct Plate & Post offerings'
+);
+select is(
+  (
+    select string_agg(price_cents::text, ',' order by price_cents)
+    from public.service_offerings
+    where service_line_id = 'plate_and_post'
+  ),
+  '5000,7500,10000',
+  'the three seeded prices are the approved VAT-inclusive euro amounts'
+);
+select is(
+  (
+    select count(*)
+    from public.service_offerings
+    where service_line_id = 'plate_and_post'
+      and fulfillment_method <> 'manual_scheduling'
+  ),
+  0::bigint,
+  'every seeded service uses the server-enforced manual-scheduling method'
+);
+select is(
+  jsonb_array_length(public.public_service_catalog() -> 'services'),
+  0,
+  'the public service catalogue is fail-closed while seeded offerings are draft'
+);
+
+update public.service_offerings
+set stripe_product_id = 'prod_integrationbasic',
+    stripe_price_id = 'price_integrationbasic',
+    updated_at = now()
+where id = '5b010000-0000-4000-8000-000000000001'::uuid;
+
+select is(
+  jsonb_array_length(public.list_service_offerings_for_staff(
+    '10000000-0000-4000-8000-000000000002'
+  ) -> 'services'),
+  3,
+  'an administrator can load the shared Plate & Post offering workspace'
+);
+select throws_ok(
+  $$select public.list_service_offerings_for_staff(
+    '10000000-0000-4000-8000-000000000007'
+  )$$,
+  'P0001',
+  'staff_admin_required',
+  'a customer cannot load provider-linked service catalogue records'
+);
+select throws_ok(
+  $$select public.create_service_checkout_attempt(
+    'basic-product-shoot',
+    '10000000-0000-4000-8000-000000000003',
+    'integration-customer-a@example.test'
+  )$$,
+  'P0001',
+  'service_not_available',
+  'an ordinary customer cannot check out a draft offering'
+);
+
+create temporary table integration_service_fixture (
+  staff_checkout_id uuid,
+  customer_checkout_id uuid,
+  service_order_id uuid,
+  async_checkout_id uuid,
+  async_order_id uuid
+);
+insert into integration_service_fixture (staff_checkout_id)
+select (public.create_service_checkout_attempt(
+  'basic-product-shoot',
+  '10000000-0000-4000-8000-000000000002',
+  'integration-admin@example.test'
+) ->> 'checkout_id')::uuid;
+
+select throws_ok(
+  $$update private.checkout_attempts
+    set session_id = '30000000-0000-4000-8000-000000000001'::uuid
+    where id = (select staff_checkout_id from integration_service_fixture)$$,
+  '23514',
+  'new row for relation "checkout_attempts" violates check constraint "checkout_attempts_target_valid"',
+  'a service checkout cannot acquire a workshop session target'
+);
+
+select ok(
+  (
+    select extract(epoch from (expires_at - created_at)) between 3599 and 3601
+    from private.checkout_attempts
+    where id = (select staff_checkout_id from integration_service_fixture)
+  ),
+  'a service Checkout Session attempt expires after exactly 60 minutes'
+);
+select is(
+  (public.create_service_checkout_attempt(
+    'basic-product-shoot',
+    '10000000-0000-4000-8000-000000000002',
+    'integration-admin@example.test'
+  ) ->> 'reused')::boolean,
+  true,
+  'a staff sandbox retry reuses its active service checkout attempt'
+);
+select is(
+  public.fail_checkout_attempt(
+    (select staff_checkout_id from integration_service_fixture),
+    '10000000-0000-4000-8000-000000000002',
+    'Disposable service checkout fixture',
+    'creating'
+  ) ->> 'checkout_status',
+  'failed',
+  'a failed service checkout becomes terminal without a workshop seat hold'
+);
+
+select is(
+  public.upsert_service_offering(
+    '10000000-0000-4000-8000-000000000002',
+    jsonb_build_object(
+      'catalog_item_id', '5b010000-0000-4000-8000-000000000001',
+      'slug', 'basic-product-shoot',
+      'title', 'Basic Product Shoot',
+      'summary', 'A focused food product photography package.',
+      'description', 'Product photography for a food-related product or project.',
+      'outcomes', '[]'::jsonb,
+      'audience', 'Food brands, restaurants, and hospitality businesses.',
+      'fulfillment_method', 'manual_scheduling',
+      'price_cents', 5000,
+      'currency', 'EUR',
+      'stripe_product_id', 'prod_integrationbasic',
+      'stripe_price_id', 'price_integrationbasic',
+      'visibility', 'public',
+      'status', 'published',
+      'seo_title', 'Basic Product Shoot | Plate & Post',
+      'seo_description', 'Food product photography from Plate & Post.'
+    )
+  ) -> 'service' ->> 'status',
+  'published',
+  'the shared staff mutation can publish a Stripe-linked service offering'
+);
+select is(
+  jsonb_array_length(public.public_service_catalog() -> 'services'),
+  1,
+  'the public catalogue includes only the configured published offering'
+);
+select ok(
+  not ((public.public_service_catalog() -> 'services' -> 0)::text ~ 'stripe_(product|price)_id'),
+  'the public catalogue omits provider-only Stripe identifiers'
+);
+
+update integration_service_fixture
+set customer_checkout_id = (public.create_service_checkout_attempt(
+  'basic-product-shoot',
+  '10000000-0000-4000-8000-000000000003',
+  'integration-customer-a@example.test'
+) ->> 'checkout_id')::uuid;
+
+select is(
+  (
+    select checkout_kind
+    from private.checkout_attempts
+    where id = (select customer_checkout_id from integration_service_fixture)
+  ),
+  'service_order',
+  'a customer service checkout persists an explicit service-order target'
+);
+update integration_service_fixture
+set service_order_id = (public.attach_service_stripe_checkout(
+    (select customer_checkout_id from integration_service_fixture),
+    '10000000-0000-4000-8000-000000000003',
+    'cs_test_integrationservice',
+    'cus_integrationservice'
+  ) ->> 'service_order_id')::uuid;
+select is(
+  (
+    select payment_status
+    from public.service_orders
+    where id = (select service_order_id from integration_service_fixture)
+  ),
+  'pending',
+  'service attachment creates the pending immutable-snapshot order before redirect'
+);
+select is(
+  (public.attach_service_stripe_checkout(
+    (select customer_checkout_id from integration_service_fixture),
+    '10000000-0000-4000-8000-000000000003',
+    'cs_test_integrationservice',
+    'cus_integrationservice'
+  ) ->> 'reused')::boolean,
+  true,
+  'retrying the same service attachment reuses its pending order atomically'
+);
+select throws_ok(
+  $$select public.attach_service_stripe_checkout(
+    (select customer_checkout_id from integration_service_fixture),
+    '10000000-0000-4000-8000-000000000003',
+    'cs_test_integrationserviceother',
+    'cus_integrationservice'
+  )$$,
+  'P0001',
+  'service_checkout_not_attachable',
+  'a conflicting attachment cannot replace the order snapshot or Stripe Session'
+);
+select is(
+  public.process_stripe_event(
+    'evt_integration_service_paid',
+    'checkout.session.completed',
+    jsonb_build_object(
+      'data', jsonb_build_object(
+        'object', jsonb_build_object(
+          'id', 'cs_test_integrationservice',
+          'client_reference_id', (select customer_checkout_id::text from integration_service_fixture),
+          'payment_status', 'paid',
+          'amount_total', 5000,
+          'currency', 'eur',
+          'payment_intent', 'pi_integrationservice',
+          'customer', 'cus_integrationservice'
+        )
+      )
+    )
+  ) ->> 'payment_status',
+  'paid',
+  'a verified paid Stripe event creates a paid service order'
+);
+
+select is(
+  (
+    select payment_status
+    from public.service_orders
+    where id = (select service_order_id from integration_service_fixture)
+  ),
+  'paid',
+  'Stripe owns and persists the service-order payment status'
+);
+select is(
+  (
+    select fulfillment_status
+    from public.service_orders
+    where id = (select service_order_id from integration_service_fixture)
+  ),
+  'new',
+  'a newly paid service order enters the independent staff fulfillment queue'
+);
+select is(
+  (
+    select count(*)
+    from private.automation_jobs
+    where payload ->> 'template' in (
+      'service_order_confirmation', 'service_order_admin_alert'
+    )
+      and payload ->> 'service_order_id' = (
+        select service_order_id::text from integration_service_fixture
+      )
+  ),
+  2::bigint,
+  'the first paid transition queues one customer confirmation and one staff alert'
+);
+select is(
+  (public.process_stripe_event(
+    'evt_integration_service_paid',
+    'checkout.session.completed',
+    jsonb_build_object(
+      'data', jsonb_build_object(
+        'object', jsonb_build_object('id', 'cs_test_integrationservice')
+      )
+    )
+  ) ->> 'duplicate')::boolean,
+  true,
+  'a duplicate service payment event is idempotently recognized'
+);
+select is(
+  (
+    select count(*)
+    from private.automation_jobs
+    where payload ->> 'template' in (
+      'service_order_confirmation', 'service_order_admin_alert'
+    )
+      and payload ->> 'service_order_id' = (
+        select service_order_id::text from integration_service_fixture
+      )
+  ),
+  2::bigint,
+  'a duplicate paid event queues no duplicate service-order email'
+);
+
+update integration_service_fixture
+set async_checkout_id = (public.create_service_checkout_attempt(
+  'basic-product-shoot',
+  '10000000-0000-4000-8000-000000000004',
+  'integration-customer-b@example.test'
+) ->> 'checkout_id')::uuid;
+update integration_service_fixture
+set async_order_id = (public.attach_service_stripe_checkout(
+  (select async_checkout_id from integration_service_fixture),
+  '10000000-0000-4000-8000-000000000004',
+  'cs_test_integrationasync',
+  'cus_integrationasync'
+) ->> 'service_order_id')::uuid;
+select is(
+  public.process_stripe_event(
+    'evt_integration_service_pending',
+    'checkout.session.completed',
+    jsonb_build_object(
+      'data', jsonb_build_object(
+        'object', jsonb_build_object(
+          'id', 'cs_test_integrationasync',
+          'payment_status', 'unpaid',
+          'amount_total', 5000,
+          'currency', 'eur',
+          'payment_intent', 'pi_integrationasync'
+        )
+      )
+    )
+  ) ->> 'payment_status',
+  'pending',
+  'an unpaid completed Checkout Session remains pending for asynchronous settlement'
+);
+select is(
+  public.process_stripe_event(
+    'evt_integration_service_async_paid',
+    'checkout.session.async_payment_succeeded',
+    jsonb_build_object(
+      'data', jsonb_build_object(
+        'object', jsonb_build_object(
+          'id', 'cs_test_integrationasync',
+          'payment_status', 'paid',
+          'amount_total', 5000,
+          'currency', 'eur',
+          'payment_intent', 'pi_integrationasync'
+        )
+      )
+    )
+  ) ->> 'payment_status',
+  'paid',
+  'an asynchronous success promotes the same pending service order to paid'
+);
+select is(
+  public.process_stripe_event(
+    'evt_integration_service_late_expired',
+    'checkout.session.expired',
+    jsonb_build_object(
+      'data', jsonb_build_object(
+        'object', jsonb_build_object(
+          'id', 'cs_test_integrationasync',
+          'payment_status', 'unpaid'
+        )
+      )
+    )
+  ) ->> 'reason',
+  'checkout_already_payment_terminal',
+  'an out-of-order expiry cannot reverse an asynchronously paid service order'
+);
+select is(
+  (public.process_stripe_event(
+    'evt_integration_service_async_paid',
+    'checkout.session.async_payment_succeeded',
+    jsonb_build_object(
+      'data', jsonb_build_object(
+        'object', jsonb_build_object('id', 'cs_test_integrationasync')
+      )
+    )
+  ) ->> 'duplicate')::boolean,
+  true,
+  'a duplicate asynchronous success event is idempotently recognized'
+);
+select is(
+  (
+    select count(*)
+    from private.automation_jobs
+    where payload ->> 'template' in (
+      'service_order_confirmation', 'service_order_admin_alert'
+    )
+      and payload ->> 'service_order_id' = (
+        select async_order_id::text from integration_service_fixture
+      )
+  ),
+  2::bigint,
+  'asynchronous settlement queues its notifications exactly once'
+);
+
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-4000-8000-000000000003';
+set local request.jwt.claim.role = 'authenticated';
+select is(
+  jsonb_array_length(public.list_my_service_orders(
+    '10000000-0000-4000-8000-000000000003'
+  ) -> 'orders'),
+  1,
+  'an authenticated customer can list their own service orders'
+);
+select ok(
+  not (
+    public.list_my_service_orders('10000000-0000-4000-8000-000000000003')
+      -> 'orders' -> 0 ? 'stripe_checkout_session_id'
+  ),
+  'the account read model omits provider-only checkout identifiers'
+);
+select throws_ok(
+  $$select public.list_my_service_orders(
+    '10000000-0000-4000-8000-000000000004'
+  )$$,
+  'P0001',
+  'service_orders_access_denied',
+  'an authenticated customer cannot request another account service-order list'
+);
+select is(
+  (select count(*) from public.service_orders),
+  1::bigint,
+  'service-order row-level security exposes only the signed-in customer order'
+);
+reset role;
+
+select is(
+  jsonb_array_length(public.list_service_orders_for_staff(
+    '10000000-0000-4000-8000-000000000002', 10
+  ) -> 'orders'),
+  2,
+  'the same staff workspace can load the service fulfillment queue'
+);
+select ok(
+  public.list_service_orders_for_staff(
+    '10000000-0000-4000-8000-000000000002', 10
+  ) -> 'orders' -> 0 ? 'stripe_payment_intent_id',
+  'the protected staff order model includes the Stripe reconciliation identifier'
+);
+select throws_ok(
+  $$select public.update_service_order_fulfillment(
+    '10000000-0000-4000-8000-000000000002',
+    (select service_order_id from integration_service_fixture),
+    'scheduled'
+  )$$,
+  'P0001',
+  'service_fulfillment_transition_invalid',
+  'staff cannot skip the service fulfillment sequence'
+);
+select is(
+  public.update_service_order_fulfillment(
+    '10000000-0000-4000-8000-000000000002',
+    (select service_order_id from integration_service_fixture),
+    'contacted'
+  ) -> 'order' ->> 'fulfillment_status',
+  'contacted',
+  'staff can mark a paid service order as contacted'
+);
+select is(
+  public.update_service_order_fulfillment(
+    '10000000-0000-4000-8000-000000000002',
+    (select service_order_id from integration_service_fixture),
+    'scheduled'
+  ) -> 'order' ->> 'fulfillment_status',
+  'scheduled',
+  'staff can schedule a contacted service order'
+);
+select is(
+  public.update_service_order_fulfillment(
+    '10000000-0000-4000-8000-000000000002',
+    (select service_order_id from integration_service_fixture),
+    'in_progress'
+  ) -> 'order' ->> 'fulfillment_status',
+  'in_progress',
+  'staff can move a scheduled service order into production'
+);
+select is(
+  public.update_service_order_fulfillment(
+    '10000000-0000-4000-8000-000000000002',
+    (select service_order_id from integration_service_fixture),
+    'delivered'
+  ) -> 'order' ->> 'fulfillment_status',
+  'delivered',
+  'staff can deliver an in-progress service order'
+);
+
+select is(
+  public.create_customer_request(
+    '10000000-0000-4000-8000-000000000003',
+    'change',
+    null,
+    (select service_order_id from integration_service_fixture),
+    'Please review a scheduling change for this service order.'
+  ) -> 'request' ->> 'service_order_id',
+  (select service_order_id::text from integration_service_fixture),
+  'a customer can submit human-reviewed change intake for their own service order'
+);
+select throws_ok(
+  $$select public.create_customer_request(
+    '10000000-0000-4000-8000-000000000004',
+    'cancellation',
+    null,
+    (select service_order_id from integration_service_fixture),
+    'Attempt to cancel another customer service order.'
+  )$$,
+  'P0001',
+  'customer_request_service_order_not_found',
+  'a customer cannot reference another account service order in rights intake'
+);
+select ok(
+  exists (
+    select 1
+    from jsonb_array_elements(
+      public.list_customer_requests_page(
+        '10000000-0000-4000-8000-000000000002',
+        null,
+        null,
+        50
+      ) -> 'items'
+    ) item
+    where item ->> 'service_order_id' = (
+      select service_order_id::text from integration_service_fixture
+    )
+      and item ->> 'kind' = 'change'
+  ),
+  'the paged staff request queue exposes a service-order change target to an admin'
+);
+select throws_ok(
+  $$select public.list_customer_requests_page(
+    '10000000-0000-4000-8000-000000000007',
+    null,
+    null,
+    50
+  )$$,
+  'P0001',
+  'staff_admin_required',
+  'a customer cannot read the paged staff request queue'
+);
+
+select is(
+  public.process_stripe_event(
+    'evt_integration_service_refund',
+    'charge.refunded',
+    jsonb_build_object(
+      'data', jsonb_build_object(
+        'object', jsonb_build_object(
+          'id', 'ch_integrationservice',
+          'payment_intent', 'pi_integrationservice',
+          'amount', 5000,
+          'amount_refunded', 5000,
+          'currency', 'eur'
+        )
+      )
+    )
+  ) ->> 'payment_status',
+  'refunded',
+  'a full verified refund independently updates service payment status'
+);
+select is(
+  (
+    select fulfillment_status
+    from public.service_orders
+    where id = (select service_order_id from integration_service_fixture)
+  ),
+  'delivered',
+  'a refund does not rewrite the staff-owned fulfillment history'
+);
+select is(
+  (
+    select count(*)
+    from private.automation_jobs
+    where payload ->> 'template' = 'service_order_refund'
+      and payload ->> 'to' = 'integration-customer-a@example.test'
+  ),
+  1::bigint,
+  'a full refund queues one service-specific customer notice'
+);
+select is(
+  (public.process_stripe_event(
+    'evt_integration_service_refund',
+    'charge.refunded',
+    jsonb_build_object(
+      'data', jsonb_build_object(
+        'object', jsonb_build_object('payment_intent', 'pi_integrationservice')
+      )
+    )
+  ) ->> 'duplicate')::boolean,
+  true,
+  'a duplicate service refund event is idempotently recognized'
+);
+select is(
+  (
+    select count(*)
+    from private.automation_jobs
+    where payload ->> 'template' = 'service_order_refund'
+      and payload ->> 'to' = 'integration-customer-a@example.test'
+  ),
+  1::bigint,
+  'a duplicate refund queues no duplicate customer notice'
+);
+select is(
+  (public.create_service_checkout_attempt(
+    'basic-product-shoot',
+    '10000000-0000-4000-8000-000000000003',
+    'integration-customer-a@example.test'
+  ) ->> 'reused')::boolean,
+  false,
+  'a customer can start a fresh service checkout after the prior attempt is terminal'
+);
+select is(
+  public.update_service_offering_price(
+    '10000000-0000-4000-8000-000000000002',
+    '5b010000-0000-4000-8000-000000000001',
+    5000,
+    'price_integrationbasicv2',
+    5000,
+    'price_integrationbasic'
+  ) -> 'service' ->> 'stripe_price_id',
+  'price_integrationbasicv2',
+  'a staff price change atomically installs a newly verified Stripe Price'
+);
+select throws_ok(
+  $$select public.update_service_offering_price(
+    '10000000-0000-4000-8000-000000000002',
+    '5b010000-0000-4000-8000-000000000001',
+    5000,
+    'price_integrationbasicv3',
+    5000,
+    'price_integrationbasic'
+  )$$,
+  'P0001',
+  'service_price_changed',
+  'a stale admin price write cannot overwrite a newer Stripe Price link'
+);
+select is(
+  public.service_analytics_summary(
+    '10000000-0000-4000-8000-000000000009',
+    now() - interval '1 hour',
+    now() + interval '1 second'
+  ),
+  jsonb_build_object(
+    'service_line_id', 'plate_and_post',
+    'orders_started', 2,
+    'paid_orders', 2,
+    'pending_orders', 0,
+    'refunded_orders', 1,
+    'gross_revenue_cents', 10000,
+    'refunded_cents', 5000,
+    'net_revenue_cents', 5000,
+    'currency', 'EUR'
+  ),
+  'an analyst receives only aggregate Plate & Post order and payment metrics'
+);
+select throws_ok(
+  $$select public.service_analytics_summary(
+    '10000000-0000-4000-8000-000000000007',
+    now() - interval '1 hour',
+    now()
+  )$$,
+  'P0001',
+  'staff_access_required',
+  'a customer cannot access protected service commerce analytics'
 );
 
 select * from finish();

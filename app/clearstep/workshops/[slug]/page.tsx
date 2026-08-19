@@ -45,7 +45,7 @@ export async function generateMetadata({ params }: WorkshopPageProps): Promise<M
   const title = `${workshop.title} — ${workshop.dateLabel}`;
   const place = workshop.format === "Live online" ? "live online" : `in ${workshop.location}`;
   const description = `${workshop.summary} ${formatWorkshopDate(workshop)}, ${place}.`;
-  const url = `/workshops/${workshopRouteSegment(workshop)}`;
+  const url = `/clearstep/workshops/${workshopRouteSegment(workshop)}`;
 
   return {
     title,
@@ -61,14 +61,14 @@ export default async function WorkshopDetailPage({ params }: WorkshopPageProps) 
   const { catalogStatus, workshop } = await getWorkshopByRouteSegment(slug);
   if (catalogStatus === "unavailable") {
     return (
-      <PublicPage>
+      <PublicPage brandKey="clearstep">
         <section className="shell py-20 md:py-28" role="status">
           <p className="eyebrow">Workshop calendar</p>
           <h1 className="max-w-3xl text-[clamp(2.8rem,6vw,4.7rem)] leading-[1.03]">Workshop details are being updated.</h1>
           <p className="mt-7 max-w-2xl text-xl leading-relaxed">
             We cannot show reliable dates, pricing, or availability right now. Please check back shortly.
           </p>
-          <Link className="button button-primary mt-7" href="/workshops">View all workshops</Link>
+          <Link className="button button-primary mt-7" href="/clearstep/workshops">View all workshops</Link>
         </section>
       </PublicPage>
     );
@@ -76,7 +76,7 @@ export default async function WorkshopDetailPage({ params }: WorkshopPageProps) 
   if (!workshop) notFound();
 
   const origin = getSiteOrigin();
-  const workshopUrl = `${origin}/workshops/${workshopRouteSegment(workshop)}`;
+  const workshopUrl = `${origin}/clearstep/workshops/${workshopRouteSegment(workshop)}`;
   const virtualLocation = { "@type": "VirtualLocation", url: workshopUrl };
   const physicalLocation = { "@type": "Place", name: workshop.location, address: { "@type": "PostalAddress", addressCountry: "NL" } };
   const location = workshop.format === "Live online"
@@ -130,7 +130,7 @@ export default async function WorkshopDetailPage({ params }: WorkshopPageProps) 
         "@type": "BreadcrumbList",
         itemListElement: [
           { "@type": "ListItem", position: 1, name: "Home", item: origin },
-          { "@type": "ListItem", position: 2, name: "Workshops", item: `${origin}/workshops` },
+          { "@type": "ListItem", position: 2, name: "Workshops", item: `${origin}/clearstep/workshops` },
           { "@type": "ListItem", position: 3, name: workshop.title, item: workshopUrl },
         ],
       },
@@ -138,10 +138,10 @@ export default async function WorkshopDetailPage({ params }: WorkshopPageProps) 
   };
 
   return (
-    <PublicPage>
+    <PublicPage brandKey="clearstep">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }} />
       <section className="shell py-12 md:py-20">
-        <Link className="text-link text-base" href="/workshops">← All workshops</Link>
+        <Link className="text-link text-base" href="/clearstep/workshops">← All workshops</Link>
         <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_390px] lg:items-start">
           <div>
             <p className="eyebrow">{workshop.eyebrow}</p>

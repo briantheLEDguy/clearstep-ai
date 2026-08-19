@@ -1,16 +1,17 @@
 import Stripe from "npm:stripe@22.3.2";
 import { ApiError } from "./http.ts";
 
-export type ExpectedWorkshopPrice = {
+export type ExpectedCatalogPrice = {
   priceId: string;
   productId: string;
   amountCents: number;
   currency: "EUR";
 };
 
-export async function validateWorkshopPrice(
+export async function validateCatalogPrice(
   stripe: Stripe,
-  expected: ExpectedWorkshopPrice,
+  expected: ExpectedCatalogPrice,
+  label = "offering",
 ): Promise<Stripe.Price> {
   const price = await stripe.prices.retrieve(expected.priceId, { expand: ["product"] });
   const productId = typeof price.product === "string" ? price.product : price.product.id;
@@ -30,10 +31,19 @@ export async function validateWorkshopPrice(
   ) {
     throw new ApiError(
       "stripe_price_mismatch",
-      "The workshop payment configuration does not match its published price.",
+      `The ${label} payment configuration does not match its published price.`,
       409,
     );
   }
 
   return price;
+}
+
+// Keep the existing admin/workshop import stable while all brands share one
+// exact Product/Price verification implementation.
+export function validateWorkshopPrice(
+  stripe: Stripe,
+  expected: ExpectedCatalogPrice,
+): Promise<Stripe.Price> {
+  return validateCatalogPrice(stripe, expected, "workshop");
 }

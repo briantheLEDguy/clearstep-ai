@@ -1,0 +1,15 @@
+# Cloudflare Pages applies these rules to the static export copied from public/.
+/*
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; font-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+  Permissions-Policy: camera=(), geolocation=(), microphone=()
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+
+# Preview and provider aliases must not compete with the canonical BNC domain.
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex, nofollow
+
+https://:branch.:project.pages.dev/*
+  X-Robots-Tag: noindex, nofollow

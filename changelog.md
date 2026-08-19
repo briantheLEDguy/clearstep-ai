@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-08-19 — BNC multi-service platform and Cloudflare Pages preparation
+
+### Added
+
+- Added a Cloudflare Pages static-header policy with CSP, clickjacking, content-type, referrer, browser-permission, and provider-alias indexing controls.
+- Added an operator runbook for provisioning the Direct Upload project, preserving DNS records, coordinating Supabase URLs, moving `bncconsulting.nl`, forwarding legacy Clearstep routes without losing customer paths or queries, verifying the cutover, and rolling back safely.
+- Added a typed BNC brand registry and one shared public shell. The BNC root now introduces Clearstep AI and Plate & Post; Clearstep marketing moved below `/clearstep/*`, while account, Auth, checkout, legal, and staff routes remain shared at the root.
+- Added Plate & Post landing, catalogue, and package-detail routes using its reviewed Ink Plum, Tomato, Cream, Olive, and Apricot palette with locally bundled Fraunces/DM Sans typography.
+- Added separate service-line, service-offering, service-order, checkout, webhook, customer-ownership, refund, staff-fulfilment, no-PII aggregate analytics, and email contracts without duplicating workshop records, the Stripe account, or the staff workspace.
+
+### Changed
+
+- Changed the canonical production origin to `https://www.bncconsulting.nl` and moved continuous deployment from GitHub Pages to a protected Cloudflare Pages Direct Upload job that reuses the validated static artifact.
+- Kept pull-request CI non-deploying while retaining the hourly catalogue rebuild and disposable Supabase integration gate.
+- Made shared checkout returns brand-neutral and target-aware, and extended the single account/staff workspace to show workshop bookings and Plate & Post orders independently.
+- Seeded Basic Product Shoot (€50), Video Content (€75), and Combo Package (€100) as unpublished drafts. Public prices, detail indexing, and Checkout stay gated until matching same-account Stripe test Products and one-time EUR Prices with `tax_behavior=inclusive` are verified and an owner or administrator publishes each offering; finance approval and Checkout/invoice VAT evidence remain separate launch gates.
+- Updated the shared account, email wrapper, and `2026-08-19.2` legal-document release for both service lines; human-reviewed customer requests can target one owned workshop enrollment or service order.
+
+### Fixed
+
+- Scoped the legacy workshop session-start checkout trigger away from Plate & Post service orders while retaining workshop timing, service target-shape, and one-active-attempt enforcement.
+
+### Operational note
+
+- No registrar, DNS, Cloudflare, Supabase, Stripe, or Google production setting is changed by the repository work; the runbooks require separate migration, Function deployment, provider, DNS, and acceptance evidence before public-release claims or permanent redirects.
+- Plate & Post currently uses a text-wordmark fallback because the Canva guideline source did not expose production-ready horizontal, stacked, monogram, or favicon files; approved exports remain a launch prerequisite.
+
 ## 2026-08-19 — Public company information
 
 ### Changed

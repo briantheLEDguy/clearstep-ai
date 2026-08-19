@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CheckoutLegalAcceptance } from "@/components/checkout-legal-acceptance";
+import { parseCheckoutResponse } from "@/lib/checkout";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { functionErrorMessage, unwrapFunctionData } from "@/lib/supabase/functions";
 import { COMPANY_DETAILS } from "@/shared/company-details";
@@ -111,6 +112,7 @@ export function WaitlistOffer({
 
     const { data, error } = await client.functions.invoke("create-checkout", {
       body: {
+        targetType: "workshop",
         workshopSlug: course.slug,
         sessionRef: session.id,
         offerToken,
@@ -124,10 +126,10 @@ export function WaitlistOffer({
       return;
     }
 
-    const result = unwrapFunctionData<{ checkoutUrl?: unknown }>(data);
-    if (!result || typeof result.checkoutUrl !== "string") {
+    const result = parseCheckoutResponse(unwrapFunctionData(data));
+    if (!result) {
       setState("error");
-      setMessage("Checkout did not return a payment link. Please contact Brian before trying again.");
+      setMessage("Checkout returned an invalid payment response. Please contact Brian before trying again.");
       return;
     }
 

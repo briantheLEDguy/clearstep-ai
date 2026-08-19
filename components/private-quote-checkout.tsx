@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CheckoutLegalAcceptance } from "@/components/checkout-legal-acceptance";
+import { parseCheckoutResponse } from "@/lib/checkout";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { functionErrorMessage, unwrapFunctionData } from "@/lib/supabase/functions";
 import { COMPANY_DETAILS } from "@/shared/company-details";
@@ -60,7 +61,7 @@ export function PrivateQuoteCheckout({ quoteToken }: { quoteToken?: string }) {
     setState("loading");
     setMessage("Opening secure checkout…");
     const { data, error } = await client.functions.invoke("create-checkout", {
-      body: { quoteToken, legalAccepted: true },
+      body: { targetType: "private_quote", quoteToken, legalAccepted: true },
     });
 
     if (error) {
@@ -69,10 +70,10 @@ export function PrivateQuoteCheckout({ quoteToken }: { quoteToken?: string }) {
       return;
     }
 
-    const result = unwrapFunctionData<{ checkoutUrl?: unknown }>(data);
-    if (!result || typeof result.checkoutUrl !== "string") {
+    const result = parseCheckoutResponse(unwrapFunctionData(data));
+    if (!result) {
       setState("error");
-      setMessage("Checkout did not return a payment link. Please contact Brian before trying again.");
+      setMessage("Checkout returned an invalid payment response. Please contact Brian before trying again.");
       return;
     }
 

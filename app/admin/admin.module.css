@@ -51,12 +51,15 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.11);
 }
 
-.adminBrand img {
-  width: 154px;
-  height: auto;
+.adminBrand strong {
+  width: fit-content;
   padding: 7px 9px;
   border-radius: 8px;
   background: var(--admin-cream);
+  color: var(--admin-navy);
+  font-family: var(--font-manrope), Manrope, Arial, sans-serif;
+  font-size: 18px;
+  letter-spacing: -0.025em;
 }
 
 .adminBrand span {
@@ -300,6 +303,14 @@
 
 .accessCard p {
   color: var(--admin-muted);
+}
+
+.accessCard .accessBrand {
+  color: var(--admin-navy);
+  font-family: var(--font-manrope), Manrope, Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
 }
 
 .skipLink {
@@ -691,6 +702,27 @@
 .panelHeaderWithAction h3,
 .invitePanel h3 {
   font-size: 20px;
+}
+
+.analyticsFilter {
+  display: grid;
+  max-width: 280px;
+  gap: 6px;
+  margin-bottom: 18px;
+  color: var(--admin-navy);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.analyticsFilter select {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #cdd8d2;
+  border-radius: 8px;
+  background: var(--admin-white);
+  color: var(--admin-navy);
+  font: inherit;
+  font-size: 12px;
 }
 
 .scheduleList,

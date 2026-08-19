@@ -72,17 +72,17 @@ export default function GuidesGate() {
   return (
     <main className={styles.gate}>
       <section className={styles.gateCard} aria-live="polite">
-        <Link href="/" aria-label="Clearstep AI home">
+        <Link href="/clearstep" aria-label="Clearstep AI home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/primary-logo.png" alt="Clearstep AI" width="200" height="53" />
         </Link>
         <p className={styles.kicker}>Member library</p>
         <h1>Guides</h1>
         <p>{message}</p>
-        {state === "signed-out" ? <a className={styles.primaryAction} href="/sign-in?next=%2Fguides">Sign in to continue</a> : null}
-        {state === "locked" ? <Link className={styles.primaryAction} href="/workshops">Browse workshops</Link> : null}
+        {state === "signed-out" ? <a className={styles.primaryAction} href="/sign-in?next=%2Fclearstep%2Fguides">Sign in to continue</a> : null}
+        {state === "locked" ? <Link className={styles.primaryAction} href="/clearstep/workshops">Browse workshops</Link> : null}
         {state === "unavailable" ? <button className={styles.primaryAction} type="button" onClick={() => window.location.reload()}>Try again</button> : null}
-        <Link className={styles.homeLink} href="/">← Back to Clearstep</Link>
+        <Link className={styles.homeLink} href="/clearstep">← Back to Clearstep</Link>
       </section>
     </main>
   );

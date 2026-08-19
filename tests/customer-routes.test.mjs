@@ -10,22 +10,30 @@ async function exported(path) {
 
 test("exports the public customer routes", async () => {
   const routes = [
-    ["/workshops", "Choose a workshop that starts with real work"],
-    ["/private-workshops", "A practical AI workshop shaped around your work"],
-    ["/about", "AI should make the next step clearer"],
-    ["/faq", "Everything you need before taking the next step"],
+    ["/clearstep", "Make AI useful"],
+    ["/clearstep/workshops", "Choose a workshop that starts with real work"],
+    ["/clearstep/private-workshops", "A practical AI workshop shaped around your work"],
+    ["/clearstep/about", "AI should make the next step clearer"],
+    ["/clearstep/faq", "Everything you need before taking the next step"],
+    ["/clearstep/guides", "Guides"],
+    ["/plate-and-post", "Content made to be craved"],
+    ["/plate-and-post/services", "Choose the content package your brand needs"],
+    ["/plate-and-post/about", "Product content with a food-first point of view"],
+    ["/plate-and-post/faq", "Questions before you book Plate &amp; Post"],
+    ["/plate-and-post/services/basic-product-shoot", "Plate &amp; Post package"],
+    ["/plate-and-post/services/video-content", "Plate &amp; Post package"],
+    ["/plate-and-post/services/combo-package", "Plate &amp; Post package"],
     ["/sign-in", "Sign in without another password"],
-    ["/account", "Your workshops, all in one place"],
+    ["/account", "Your bookings and service orders, all in one place"],
     ["/account/private-quote", "Your tailored workshop is ready"],
     ["/account/waitlist", "Your waitlist offer is ready"],
-    ["/guides", "Guides"],
     ["/staff/invite", "Accept your workspace invitation"],
     ["/privacy", "Privacy policy"],
     ["/terms", "Terms of service"],
     ["/cancellation", "Cancellation policy"],
     ["/complaints", "Complaints procedure"],
-    ["/checkout/success", "your next clear step is underway"],
-    ["/checkout/cancel", "Your booking wasn’t completed"],
+    ["/checkout/success", "Checking your payment return"],
+    ["/checkout/cancel", "Checkout cancelled"],
   ];
 
   for (const [path, expectedText] of routes) {
@@ -33,17 +41,29 @@ test("exports the public customer routes", async () => {
   }
 });
 
+test("does not duplicate the retired root Clearstep marketing routes", async () => {
+  for (const path of ["/workshops", "/private-workshops", "/about", "/faq", "/guides"]) {
+    await assert.rejects(exported(path), { code: "ENOENT" }, path);
+  }
+});
+
 test("publishes search discovery files without private account routes", async () => {
   const sitemap = await readFile(new URL("../out/sitemap.xml", import.meta.url), "utf8");
-  assert.match(sitemap, /https:\/\/www\.clearstep-ai\.nl\/workshops</);
-  assert.match(sitemap, /https:\/\/www\.clearstep-ai\.nl\/complaints</);
-  assert.doesNotMatch(sitemap, /\/account|\/checkout|\/sign-in|\/staff/);
+  assert.match(sitemap, /https:\/\/www\.bncconsulting\.nl\/clearstep\/<\/loc>/);
+  assert.match(sitemap, /https:\/\/www\.bncconsulting\.nl\/clearstep\/workshops\/<\/loc>/);
+  assert.match(sitemap, /https:\/\/www\.bncconsulting\.nl\/plate-and-post\/<\/loc>/);
+  assert.match(sitemap, /https:\/\/www\.bncconsulting\.nl\/plate-and-post\/services\/<\/loc>/);
+  assert.match(sitemap, /https:\/\/www\.bncconsulting\.nl\/plate-and-post\/about\/<\/loc>/);
+  assert.match(sitemap, /https:\/\/www\.bncconsulting\.nl\/plate-and-post\/faq\/<\/loc>/);
+  assert.match(sitemap, /https:\/\/www\.bncconsulting\.nl\/complaints\/<\/loc>/);
+  assert.doesNotMatch(sitemap, /https:\/\/www\.clearstep-ai\.nl|https:\/\/www\.bncconsulting\.nl\/(?:workshops|private-workshops|about|faq|guides)\/<\/loc>/);
+  assert.doesNotMatch(sitemap, /\/account|\/checkout|\/sign-in|\/staff|\/clearstep\/guides/);
 
   const robots = await readFile(new URL("../out/robots.txt", import.meta.url), "utf8");
   assert.match(robots, /Disallow:\s*\/staff\//i);
   assert.doesNotMatch(robots, /Disallow:\s*\/account/i);
   assert.doesNotMatch(robots, /Disallow:\s*\/admin/i);
-  assert.match(robots, /Sitemap:\s*https:\/\/www\.clearstep-ai\.nl\/sitemap\.xml/i);
+  assert.match(robots, /Sitemap:\s*https:\/\/www\.bncconsulting\.nl\/sitemap\.xml/i);
 });
 
 test("publishes concise company details and complaints guidance without approval messaging", async () => {
@@ -100,12 +120,12 @@ test("uses the finalized Supabase booking and analytics contracts", async () => 
 
   const privateQuoteSource = await readFile(new URL("../components/private-quote-checkout.tsx", import.meta.url), "utf8");
   assert.match(privateQuoteSource, /functions\.invoke\("create-checkout"/);
-  assert.match(privateQuoteSource, /body:\s*\{\s*quoteToken,\s*legalAccepted:\s*true\s*\}/);
+  assert.match(privateQuoteSource, /body:\s*\{\s*targetType:\s*"private_quote",\s*quoteToken,\s*legalAccepted:\s*true\s*\}/);
 });
 
-test("preserves the legacy Stripe success URL in the browser", async () => {
+test("preserves the legacy Stripe success URL as a workshop result", async () => {
   const source = await readFile(new URL("../components/query-routed-content.tsx", import.meta.url), "utf8");
   assert.match(source, /searchParams\.get\("session"\)/u);
-  assert.match(source, /`\/checkout\/success\?session_id=\$\{encodeURIComponent\(sessionId\)\}`/u);
+  assert.match(source, /`\/checkout\/success\?session_id=\$\{encodeURIComponent\(sessionId\)\}&target=workshop`/u);
   assert.match(source, /window\.location\.replace\(destination\)/u);
 });

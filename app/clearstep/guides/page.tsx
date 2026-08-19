@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function GuidesPage() {
-  return <GuidesGate />;
+  return <div className="brand-surface" data-brand="clearstep"><GuidesGate /></div>;
 }

@@ -7,19 +7,19 @@ export const LEGAL_DOCUMENTS = {
   terms: {
     key: "terms",
     title: "Terms of service",
-    version: "2026-08-19.1",
+    version: "2026-08-19.2",
     effectiveDate: "19 August 2026",
   },
   privacy: {
     key: "privacy",
     title: "Privacy policy",
-    version: "2026-08-19.1",
+    version: "2026-08-19.2",
     effectiveDate: "19 August 2026",
   },
   cancellation: {
     key: "cancellation",
     title: "Cancellation policy",
-    version: "2026-08-19.1",
+    version: "2026-08-19.2",
     effectiveDate: "19 August 2026",
   },
 } as const;

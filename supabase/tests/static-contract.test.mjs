@@ -26,6 +26,8 @@ test("runtime hardening and later admin controls have ordered migrations", async
     "20260819123000_admin_cursor_pagination.sql",
     "20260819125320_strict_anonymous_analytics_schema.sql",
     "20260819140629_versioned_checkout_legal_acceptance.sql",
+    "20260819161227_bnc_service_commerce.sql",
+    "20260819184150_scope_service_checkout_session_guard.sql",
   ]);
 });
 
@@ -69,8 +71,10 @@ test("Stripe Checkout follows current API, dynamic methods, tax gate, and signat
   const priceValidation = await read("functions/_shared/stripe.ts");
   assert.match(checkout, /apiVersion:\s*"2026-06-24\.dahlia"/u);
   assert.match(checkout, /integration_identifier:\s*"clearstep_[a-z]{8}"/u);
-  assert.match(checkout, /\/checkout\/success\?session_id=\{CHECKOUT_SESSION_ID\}/u);
-  assert.match(checkout, /\/checkout\/cancel\?workshop=\$\{encodeURIComponent/u);
+  assert.match(checkout, /\/checkout\/success\/\?session_id=\{CHECKOUT_SESSION_ID\}&\$\{targetQuery\}/u);
+  assert.match(checkout, /\/checkout\/cancel\/\?\$\{targetQuery\}/u);
+  assert.match(checkout, /target=service&slug=\$\{encodeURIComponent/u);
+  assert.match(checkout, /target=workshop&workshop=\$\{encodeURIComponent/u);
   assert.doesNotMatch(checkout, /payment_method_types/u);
   assert.match(checkout, /STRIPE_AUTOMATIC_TAX_ENABLED/u);
   assert.match(checkout, /automaticTaxEnabled\s*\?\s*\{ automatic_tax/u);
@@ -82,6 +86,149 @@ test("Stripe Checkout follows current API, dynamic methods, tax gate, and signat
   assert.match(priceValidation, /price\.unit_amount !== expected\.amountCents/u);
   assert.match(priceValidation, /price\.tax_behavior !== "inclusive"/u);
   assert.match(priceValidation, /productId !== expected\.productId/u);
+});
+
+test("BNC service commerce stays separated, staff-gated, and webhook authoritative", async () => {
+  const migration = await read("migrations/20260819161227_bnc_service_commerce.sql");
+  const checkout = await read("functions/create-checkout/index.ts");
+  const webhookEdge = await read("functions/stripe-webhook/index.ts");
+  const priceValidation = await read("functions/_shared/stripe.ts");
+
+  for (const table of ["service_lines", "service_offerings", "service_orders"]) {
+    assert.match(migration, new RegExp(`create table public\\.${table}`, "u"));
+  }
+  assert.match(migration, /'clearstep',[\s\S]*'clearstep',[\s\S]*'plate_and_post',[\s\S]*'plate-and-post'/u);
+  assert.match(migration, /alter table public\.courses[\s\S]*service_line_id text references public\.service_lines/u);
+  assert.match(migration, /courses_clearstep_service_line[\s\S]*service_line_id = 'clearstep'/u);
+  assert.match(migration, /fulfillment_method text not null default 'manual_scheduling'/u);
+  assert.match(migration, /service_offerings_fulfillment_method_valid[\s\S]*fulfillment_method = 'manual_scheduling'/u);
+
+  for (const [slug, cents] of [
+    ["basic-product-shoot", 5000],
+    ["video-content", 7500],
+    ["combo-package", 10000],
+  ]) {
+    assert.match(migration, new RegExp(`'${slug}'[\\s\\S]*?\\b${cents}\\b`, "u"));
+  }
+  assert.match(migration, /'public',[\s\S]*'draft'/u);
+  assert.doesNotMatch(
+    migration.match(/insert into public\.service_offerings[\s\S]*?on conflict \(service_line_id, slug\) do nothing;/u)?.[0] ?? "",
+    /'prod_[A-Za-z0-9]+'|'price_[A-Za-z0-9]+'/u,
+  );
+
+  const publicCatalog = migration.match(
+    /create or replace function public\.public_service_catalog[\s\S]*?\$\$;/u,
+  )?.[0] ?? "";
+  assert.match(publicCatalog, /p_business_unit text default 'plate_and_post'/u);
+  assert.match(publicCatalog, /offering\.status = 'published'/u);
+  assert.match(publicCatalog, /offering\.stripe_product_id is not null/u);
+  assert.match(publicCatalog, /offering\.stripe_price_id is not null/u);
+  assert.match(publicCatalog, /'business_unit', 'plate_and_post'/u);
+  assert.doesNotMatch(publicCatalog, /stripe_product_id'|stripe_price_id'/u);
+
+  assert.match(checkout, /const targetTypeWasOmitted = body\.targetType === undefined/u);
+  assert.match(checkout, /legacyTargetTypeDeadlineMs/u);
+  assert.match(checkout, /\? "private_quote"\s*: "workshop"/u);
+  assert.match(checkout, /body\.serviceLine !== "plate_and_post"/u);
+  assert.match(checkout, /typeof body\.offeringSlug !== "string"/u);
+  assert.match(checkout, /"create_service_checkout_attempt"/u);
+  assert.match(checkout, /"attach_service_stripe_checkout"/u);
+  assert.ok(
+    checkout.indexOf('"attach_service_stripe_checkout"')
+      < checkout.lastIndexOf("return ok({\n        checkoutUrl:"),
+    "the service Session and pending order must attach before redirect data is returned",
+  );
+  assert.match(checkout, /stripeSession\?\.id[\s\S]*stripe\.checkout\.sessions\.expire/u);
+  assert.match(checkout, /fail_checkout_attempt/u);
+  assert.match(checkout, /validateCatalogPrice/u);
+  assert.doesNotMatch(checkout, /body\.(?:amount|amountCents|priceId|productId|returnUrl|successUrl|cancelUrl)/u);
+  assert.match(migration, /v_is_staff := private\.staff_has_role\(p_user_id, array\['owner', 'admin'\]\)/u);
+  assert.match(migration, /offering\.status = 'draft' and v_is_staff/u);
+  assert.match(migration, /v_checkout_expires_at := now\(\) \+ interval '60 minutes'/u);
+  assert.match(migration, /status = 'open' and grace_expires_at <= now\(\)/u);
+  assert.match(migration, /status in \('creating', 'open', 'payment_pending'\)/u);
+  assert.match(migration, /checkout_attempts_one_active_per_user_service_idx/u);
+
+  const serviceAttach = migration.match(
+    /create or replace function public\.attach_service_stripe_checkout[\s\S]*?\$\$;/u,
+  )?.[0] ?? "";
+  assert.match(serviceAttach, /checkout_attempt\.checkout_kind = 'service_order'/u);
+  assert.match(serviceAttach, /for update/u);
+  assert.match(serviceAttach, /v_checkout\.status <> 'creating'/u);
+  assert.match(serviceAttach, /insert into public\.service_orders/u);
+  assert.match(serviceAttach, /'pending',[\s\S]*'new'/u);
+  assert.match(serviceAttach, /'reused', true/u);
+
+  assert.match(migration, /service_orders_payment_status_valid[\s\S]*'pending', 'paid', 'failed', 'refunded'/u);
+  assert.match(migration, /service_orders_fulfillment_status_valid[\s\S]*'new', 'contacted', 'scheduled', 'in_progress', 'delivered', 'cancelled'/u);
+  assert.match(migration, /v_order\.payment_status <> 'paid'/u);
+  assert.match(migration, /'fulfillment_status', v_order\.fulfillment_status/u);
+  assert.match(migration, /create policy service_orders_own_read/u);
+
+  const myOrders = migration.match(
+    /create or replace function public\.list_my_service_orders[\s\S]*?\$\$;/u,
+  )?.[0] ?? "";
+  assert.match(myOrders, /auth\.uid\(\)[\s\S]*p_user_id/u);
+  assert.match(myOrders, /private\.service_order_account_json/u);
+  const accountOrderJson = migration.match(
+    /create or replace function private\.service_order_account_json[\s\S]*?\$\$;/u,
+  )?.[0] ?? "";
+  assert.match(accountOrderJson, /'payment_status'/u);
+  assert.match(accountOrderJson, /'fulfillment_status'/u);
+  assert.doesNotMatch(accountOrderJson, /stripe_|customer_email|user_id/u);
+
+  assert.match(migration, /add column service_order_id uuid references public\.service_orders/u);
+  assert.match(migration, /num_nonnulls\(enrollment_id, service_order_id\) = 1/u);
+  assert.match(migration, /customer_request_service_order_not_found/u);
+  assert.match(migration, /service_order\.user_id = p_user_id/u);
+
+  assert.match(migration, /rename to process_workshop_stripe_event/u);
+  assert.match(migration, /create or replace function public\.process_service_stripe_event/u);
+  assert.match(migration, /return public\.process_service_stripe_event/u);
+  assert.match(migration, /amount_total[\s\S]*v_checkout\.amount_cents/u);
+  assert.match(migration, /upper\(coalesce\(v_object ->> 'currency'/u);
+  assert.match(migration, /checkout_already_payment_terminal/u);
+  assert.match(migration, /v_target_payment_status := case[\s\S]*async_payment_succeeded/u);
+  assert.match(migration, /v_target_payment_status = 'paid' and not v_was_paid/u);
+  for (const template of [
+    "service_order_confirmation",
+    "service_order_admin_alert",
+    "service_order_refund",
+  ]) {
+    assert.match(migration, new RegExp(`'template', '${template}'`, "u"));
+  }
+  assert.match(webhookEdge, /serviceOrderId: result\.service_order_id/u);
+
+  assert.match(priceValidation, /export async function validateCatalogPrice/u);
+  assert.match(priceValidation, /return validateCatalogPrice\(stripe, expected, "workshop"\)/u);
+  for (const rpcName of [
+    "list_service_offerings_for_staff",
+    "upsert_service_offering",
+    "update_service_offering_price",
+    "list_service_orders_for_staff",
+    "service_analytics_summary",
+    "update_service_order_fulfillment",
+  ]) {
+    assert.match(migration, new RegExp(`create or replace function public\\.${rpcName}`, "u"));
+  }
+  const serviceAnalytics = migration.match(
+    /create or replace function public\.service_analytics_summary[\s\S]*?\$\$;/u,
+  )?.[0] ?? "";
+  assert.match(serviceAnalytics, /array\['owner', 'admin', 'analyst'\]/u);
+  assert.match(serviceAnalytics, /payment\.paid_at >= p_from/u);
+  assert.match(serviceAnalytics, /payment\.refunded_at >= p_from/u);
+  for (const metric of [
+    "orders_started",
+    "paid_orders",
+    "pending_orders",
+    "refunded_orders",
+    "gross_revenue_cents",
+    "refunded_cents",
+    "net_revenue_cents",
+  ]) {
+    assert.match(serviceAnalytics, new RegExp(`'${metric}'`, "u"));
+  }
+  assert.doesNotMatch(serviceAnalytics, /customer_email|'user_id'|service_slug|service_title/u);
 });
 
 test("verified Stripe processing failures are recorded durably without consuming retries", async () => {
@@ -601,6 +748,8 @@ test("checkout, waitlist, and quote windows honor start time, FIFO, and token re
   const booking = await read("migrations/20260818130100_booking_workflows.sql");
   const admin = await read("migrations/20260818130200_admin_analytics_automation.sql");
   const runtime = await read("migrations/20260818130500_runtime_security_hardening.sql");
+  const service = await read("migrations/20260819161227_bnc_service_commerce.sql");
+  const checkoutScope = await read("migrations/20260819184150_scope_service_checkout_session_guard.sql");
   const checkout = booking.match(/create or replace function public\.create_checkout_hold[\s\S]*?\$\$;/u)?.[0] ?? "";
   const offer = admin.slice(admin.indexOf("when 'waitlist_offer'"), admin.indexOf("when 'waitlist_remove'"));
   const quoteSend = admin.slice(admin.indexOf("when 'quote_send'"), admin.indexOf("when 'analytics_summary'"));
@@ -608,6 +757,14 @@ test("checkout, waitlist, and quote windows honor start time, FIFO, and token re
   assert.match(core, /seat_hold_must_expire_before_session_start/u);
   assert.match(core, /checkout_must_settle_by_session_start/u);
   assert.match(core, /waitlist_offer_exceeds_booking_deadline/u);
+  assert.match(checkoutScope, /create or replace function private\.enforce_checkout_before_session_start\(\)/u);
+  assert.match(checkoutScope, /if new\.checkout_kind = 'service_order' then\s+return new;\s+end if;/u);
+  assert.match(checkoutScope, /where s\.id = new\.session_id\s+and new\.expires_at < s\.start_at\s+and new\.grace_expires_at <= s\.start_at/u);
+  assert.match(checkoutScope, /message = 'checkout_must_settle_by_session_start'/u);
+  assert.match(checkoutScope, /revoke execute on function private\.enforce_checkout_before_session_start\(\)\s+from public, anon, authenticated, service_role;/u);
+  assert.doesNotMatch(checkoutScope, /(?:create|drop) trigger/u);
+  assert.match(service, /constraint checkout_attempts_target_valid check[\s\S]*checkout_kind = 'service_order'[\s\S]*hold_id is null[\s\S]*session_id is null[\s\S]*service_offering_id is not null/u);
+  assert.match(service, /create unique index checkout_attempts_one_active_per_user_service_idx[\s\S]*where checkout_kind = 'service_order'[\s\S]*status in \('creating', 'open', 'payment_pending'\)/u);
   assert.match(checkout, /v_booking_deadline_at := v_session\.start_at - interval '32 minutes'/u);
   assert.match(checkout, /'checkout_expires_at', v_checkout\.expires_at/u);
   assert.match(checkout, /'booking_deadline_at', v_booking_deadline_at/u);
@@ -659,11 +816,14 @@ test("private quotes are hidden, token-bound, and receive a server-owned payment
   assert.match(adminSql, /'private'[\s\S]*'published'/u);
   assert.match(booking, /resolve_private_quote_checkout/u);
   assert.match(booking, /lower\(r\.email::text\) = lower\(trim\(p_user_email\)\)/u);
+  assert.match(checkout, /targetType !== "private_quote"/u);
+  assert.match(checkout, /targetType === "private_quote"/u);
+  assert.match(checkout, /body\.workshopSlug !== undefined[\s\S]*body\.offerToken !== undefined/u);
   assert.match(checkout, /p_token_hash: await sha256Hex\(quoteToken\)/u);
   assert.match(checkout, /create_private_quote_checkout_hold/u);
-  assert.match(checkout, /existing\.expires_at \* 1_000 > checkoutDeadlineMs/u);
-  assert.match(checkout, /Math\.min\([\s\S]*holdExpiresAtMs,[\s\S]*databaseCheckoutExpiresAtMs,[\s\S]*sessionStartsAtMs,[\s\S]*quoteExpiresAtMs/u);
-  assert.match(checkout, /databaseCheckoutExpiresAtMs > quoteExpiresAtMs/u);
+  assert.match(checkout, /existing\.expires_at \* 1_000 > prepared\.checkoutDeadlineMs/u);
+  assert.match(checkout, /checkoutDeadlineMs:\s*Math\.min\([\s\S]*workshopHold\.hold_expires_at[\s\S]*workshopHold\.checkout_expires_at[\s\S]*workshopHold\.start_at[\s\S]*quoteExpiresAtMs/u);
+  assert.match(checkout, /prepared\.checkoutExpiresAt[\s\S]*privateQuote\.checkout_expires_at/u);
   assert.match(runtime, /create or replace function public\.create_private_quote_checkout_hold/u);
   assert.match(runtime, /checkout_expires_at <= now\(\) \+ interval '31 minutes'/u);
   assert.match(runtime, /least\([\s\S]*v_quote\.checkout_expires_at/u);

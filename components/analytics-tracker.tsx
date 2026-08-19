@@ -29,7 +29,7 @@ function EnabledAnalyticsTracker() {
     const properties = campaignProperties();
     void trackEvent("page_view", properties);
 
-    const routeSegment = pathname.match(/^\/workshops\/([^/]+)$/u)?.[1];
+    const routeSegment = pathname.match(/^\/clearstep\/workshops\/([^/]+)$/u)?.[1];
     const workshopRoute = routeSegment ? parseWorkshopRouteSegment(routeSegment) : null;
     if (workshopRoute) {
       void trackEvent("course_view", { ...properties, course_slug: workshopRoute.slug });

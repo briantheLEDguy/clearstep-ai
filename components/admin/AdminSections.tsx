@@ -24,6 +24,9 @@ import {
   type IntegrationRecord,
   type PrivateRequestRecord,
   type QuoteRecord,
+  type ServiceOfferingRecord,
+  type ServiceAnalyticsSummary,
+  type ServiceOrderRecord,
   type SessionRecord,
   type StaffInvitationRecord,
   type StaffMemberRecord,
@@ -56,9 +59,10 @@ type PendingAction = {
 
 type CustomerRequest = {
   id: string;
-  kind: "access" | "correction" | "erasure" | "restriction" | "objection" | "cancellation";
+  kind: "access" | "correction" | "erasure" | "restriction" | "objection" | "cancellation" | "change";
   status: "submitted" | "in_review" | "awaiting_customer" | "completed" | "declined";
   enrollment_id: string | null;
+  service_order_id: string | null;
   details: string | null;
   created_at: string;
   updated_at: string;
@@ -69,8 +73,8 @@ type CustomerRequest = {
 const sectionHeadingIds: Record<string, string> = {
   "Workshop operations": "overview-title",
   Analytics: "analytics-title",
-  "Courses & sessions": "catalog-title",
-  Bookings: "bookings-title",
+  "Service catalog": "catalog-title",
+  "Bookings & orders": "bookings-title",
   Waitlist: "waitlist-title",
   "Requests & quotes": "private-title",
   "Customer requests": "customer-requests-title",
@@ -235,9 +239,10 @@ function parseCustomerRequest(value: unknown): CustomerRequest {
   const record = pageObject(value, "customer_requests");
   return {
     id: pageString(record, "id", "customer_requests"),
-    kind: pageEnum(record, "kind", "customer_requests", ["access", "correction", "erasure", "restriction", "objection", "cancellation"]),
+    kind: pageEnum(record, "kind", "customer_requests", ["access", "correction", "erasure", "restriction", "objection", "cancellation", "change"]),
     status: pageEnum(record, "status", "customer_requests", ["submitted", "in_review", "awaiting_customer", "completed", "declined"]),
     enrollment_id: pageNullableString(record, "enrollment_id", "customer_requests"),
+    service_order_id: pageNullableString(record, "service_order_id", "customer_requests"),
     details: pageNullableString(record, "details", "customer_requests"),
     created_at: pageString(record, "created_at", "customer_requests"),
     updated_at: pageString(record, "updated_at", "customer_requests"),
@@ -395,6 +400,37 @@ function coursePayload(course: CourseRecord, status: string, stripeIds?: { produ
   };
 }
 
+function serviceOfferingPayload(
+  service: ServiceOfferingRecord,
+  status = service.status,
+  stripeIds?: { productId: string; priceId: string },
+) {
+  return {
+    catalog_item_id: service.catalog_item_id,
+    slug: service.slug,
+    title: service.title,
+    summary: service.summary,
+    description: service.description,
+    outcomes: service.outcomes,
+    audience: service.audience,
+    duration_minutes: service.duration_minutes,
+    fulfillment_method: "manual_scheduling",
+    price_cents: service.price_cents,
+    currency: "EUR",
+    stripe_product_id: stripeIds?.productId ?? service.stripe_product_id ?? "",
+    stripe_price_id: stripeIds?.priceId ?? service.stripe_price_id ?? "",
+    visibility: service.visibility,
+    status,
+    seo_title: service.seo_title ?? "",
+    seo_description: service.seo_description ?? "",
+  };
+}
+
+function serviceOfferingStatus(value: string): ServiceOfferingRecord["status"] {
+  if (value === "draft" || value === "published" || value === "archived") return value;
+  throw new Error("Choose a valid service package status.");
+}
+
 function sessionPayload(session: SessionRecord, status: string) {
   return {
     id: session.id,
@@ -479,14 +515,25 @@ function PendingActionDialog({ action, onDismiss }: { action: PendingAction | nu
   );
 }
 
-function useAnalytics() {
+type AnalyticsServiceLine = "clearstep" | "plate_and_post";
+type AnalyticsResult =
+  | { serviceLine: "clearstep"; summary: AnalyticsSummary }
+  | { serviceLine: "plate_and_post"; summary: ServiceAnalyticsSummary };
+
+function useAnalytics(serviceLine: AnalyticsServiceLine) {
   const { client } = useAdminWorkspace();
   const loader = useCallback(async () => {
     const now = new Date();
     const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    return invokeAdmin<AnalyticsSummary>(client, "analytics_summary", { from: from.toISOString(), to: now.toISOString() });
-  }, [client]);
-  return useAdminResource("analytics", loader);
+    const range = { from: from.toISOString(), to: now.toISOString() };
+    if (serviceLine === "plate_and_post") {
+      const summary = await invokeAdmin<ServiceAnalyticsSummary>(client, "service_analytics_summary", range);
+      return { serviceLine, summary } satisfies AnalyticsResult;
+    }
+    const summary = await invokeAdmin<AnalyticsSummary>(client, "analytics_summary", range);
+    return { serviceLine, summary } satisfies AnalyticsResult;
+  }, [client, serviceLine]);
+  return useAdminResource<AnalyticsResult>(serviceLine === "clearstep" ? "analytics" : "serviceAnalytics", loader);
 }
 
 function useOverview() {
@@ -528,7 +575,7 @@ export function OverviewSection() {
         <Panel>
           <PanelHeader kicker="Quick routes" title="Open an operation" />
           <div className={styles.attentionList}>
-            {role !== "analyst" ? <Link className={styles.attentionItem} href="/admin/catalog"><span className={`${styles.attentionMarker} ${styles.toneInfo}`} aria-hidden="true" /><span><strong>Courses & sessions</strong><small>Manage the catalogue and schedule</small></span><span className={styles.arrow} aria-hidden="true">→</span></Link> : null}
+            {role !== "analyst" ? <Link className={styles.attentionItem} href="/admin/catalog"><span className={`${styles.attentionMarker} ${styles.toneInfo}`} aria-hidden="true" /><span><strong>Service catalog</strong><small>Manage workshops, sessions, and service packages</small></span><span className={styles.arrow} aria-hidden="true">→</span></Link> : null}
             <Link className={styles.attentionItem} href="/admin/analytics"><span className={`${styles.attentionMarker} ${styles.toneSuccess}`} aria-hidden="true" /><span><strong>Analytics</strong><small>Review first-party activity and results</small></span><span className={styles.arrow} aria-hidden="true">→</span></Link>
             {role === "owner" ? <Link className={styles.attentionItem} href="/admin/automation"><span className={`${styles.attentionMarker} ${analytics?.automation_failures ? styles.toneDanger : styles.toneSuccess}`} aria-hidden="true" /><span><strong>Automation</strong><small>{analytics?.automation_failures ?? 0} terminal jobs in this period</small></span><span className={styles.arrow} aria-hidden="true">→</span></Link> : null}
           </div>
@@ -539,7 +586,10 @@ export function OverviewSection() {
 }
 
 export function AnalyticsSection() {
-  const { data: analytics, error, loading, reload } = useAnalytics();
+  const [serviceLine, setServiceLine] = useState<AnalyticsServiceLine>("clearstep");
+  const { data, error, loading, reload } = useAnalytics(serviceLine);
+  const analytics = data?.serviceLine === "clearstep" ? data.summary : null;
+  const serviceAnalytics = data?.serviceLine === "plate_and_post" ? data.summary : null;
   const funnel = [
     { label: "Page views", value: analytics?.page_views ?? 0 },
     { label: "Workshop views", value: analytics?.course_views ?? 0 },
@@ -549,9 +599,20 @@ export function AnalyticsSection() {
   const max = Math.max(1, ...funnel.map((step) => step.value));
   return (
     <section className={styles.section} aria-labelledby="analytics-title">
-      <SectionHeader eyebrow="Last 30 days" title="Analytics" description="First-party, privacy-friendly activity and verified enrolment results." action={<RefreshButton onClick={reload} loading={loading} />} />
+      <SectionHeader eyebrow="Last 30 days" title="Analytics" description="First-party, privacy-friendly activity and verified purchase results." action={<RefreshButton onClick={reload} loading={loading} />} />
+      <div className={styles.analyticsFilter}>
+        <label htmlFor="analytics-service-line">Service line</label>
+        <select
+          id="analytics-service-line"
+          value={serviceLine}
+          onChange={(event) => setServiceLine(event.target.value as AnalyticsServiceLine)}
+        >
+          <option value="clearstep">Clearstep AI</option>
+          <option value="plate_and_post">Plate &amp; Post</option>
+        </select>
+      </div>
       <SectionError message={error} />
-      {analytics ? <>
+      {serviceLine === "clearstep" && analytics ? <>
         <div className={styles.analyticsMetrics} aria-busy={loading}>
           <Panel><span>Page views</span><strong>{analytics.page_views}</strong><small>First-party events</small></Panel>
           <Panel><span>Workshop views</span><strong>{analytics.course_views}</strong><small>{percent(analytics.course_views, analytics.page_views)} of page views</small></Panel>
@@ -568,7 +629,18 @@ export function AnalyticsSection() {
           <MetricList kicker="Capacity" title="Upcoming occupancy" entries={analytics.upcoming_occupancy.map((session) => ({ label: session.course_title, detail: `${session.confirmed + session.active_holds} of ${session.capacity} places · ${dateTime(session.start_at)}`, value: session.confirmed + session.active_holds, maximum: session.capacity }))} emptyTitle="No upcoming sessions" emptyDescription="Occupancy appears after a session is scheduled." />
           <MetricList kicker="Acquisition" title="UTM sources" entries={analytics.utm_sources.map((source) => ({ label: source.source, detail: `${source.visits} visits`, value: source.visits }))} emptyTitle="No campaign sources yet" emptyDescription="UTM-tagged visits will appear here without third-party cookies." />
         </div>
-      </> : error ? null : <EmptyState title="Loading analytics" description="The protected analytics summary is loading." />}
+      </> : null}
+      {serviceLine === "plate_and_post" && serviceAnalytics ? (
+        <div className={styles.analyticsMetrics} aria-busy={loading}>
+          <Panel><span>Orders started</span><strong>{serviceAnalytics.orders_started}</strong><small>Checkout sessions created</small></Panel>
+          <Panel><span>Paid orders</span><strong>{serviceAnalytics.paid_orders}</strong><small>Verified Stripe payments</small></Panel>
+          <Panel><span>Pending payments</span><strong>{serviceAnalytics.pending_orders}</strong><small>Not yet payment-terminal</small></Panel>
+          <Panel><span>Refunded orders</span><strong>{serviceAnalytics.refunded_orders}</strong><small>{money(serviceAnalytics.refunded_cents, serviceAnalytics.currency)} refunded</small></Panel>
+          <Panel><span>Gross revenue</span><strong>{money(serviceAnalytics.gross_revenue_cents, serviceAnalytics.currency)}</strong><small>Paid value before refunds</small></Panel>
+          <Panel><span>Net revenue</span><strong>{money(serviceAnalytics.net_revenue_cents, serviceAnalytics.currency)}</strong><small>Gross less recorded refunds</small></Panel>
+        </div>
+      ) : null}
+      {!data && !error ? <EmptyState title="Loading analytics" description="The protected analytics summary is loading." /> : null}
     </section>
   );
 }
@@ -580,16 +652,27 @@ function MetricList({ kicker, title, entries, emptyTitle, emptyDescription }: { 
 
 export function CatalogSection() {
   const { client, busy, mutate } = useAdminWorkspace();
-  const loader = useCallback(async () => arrayFrom<CourseRecord>(await invokeAdmin<unknown>(client, "catalog_list"), "courses"), [client]);
-  const { data: courseData, error, loading, reload } = useAdminResource("catalog", loader);
-  const courses = courseData ?? [];
+  const loader = useCallback(async () => {
+    const [courseResponse, serviceResponse] = await Promise.all([
+      invokeAdmin<unknown>(client, "catalog_list"),
+      invokeAdmin<unknown>(client, "service_offerings_list"),
+    ]);
+    return {
+      courses: arrayFrom<CourseRecord>(courseResponse, "courses"),
+      services: arrayFrom<ServiceOfferingRecord>(serviceResponse, "services"),
+    };
+  }, [client]);
+  const { data: catalogData, error, loading, reload } = useAdminResource("catalog", loader);
+  const courses = catalogData?.courses ?? [];
+  const services = catalogData?.services ?? [];
   const [selectedSession, setSelectedSession] = useState<SessionWithCourse | null>(null);
   const sessions = courses.flatMap((course) => course.sessions.map((session) => ({ ...session, courseTitle: course.title })));
   const doMutate: Mutate = mutate;
   return (
     <section className={styles.section} aria-labelledby="catalog-title">
-      <SectionHeader eyebrow="Programme" title="Courses & sessions" description="Manage the live catalogue and schedule. Publishing a session queues its calendar setup." action={<RefreshButton onClick={reload} loading={loading} />} />
+      <SectionHeader eyebrow="BNC services" title="Service catalog" description="Manage Clearstep workshops and Plate & Post packages from one protected catalog. Publishing a workshop session queues its calendar setup; service packages use manual scheduling." action={<RefreshButton onClick={reload} loading={loading} />} />
       <SectionError message={error} />
+      <PanelHeader kicker="Clearstep AI" title="Workshops & sessions" />
       <div className={styles.actionGrid} aria-busy={loading}>
         <CourseCreateForm busy={busy === "course-create"} onSubmit={(payload) => doMutate({ operation: "course-create", action: "course_upsert", payload, success: "Draft course created.", invalidate: ["catalog", "analytics"] })} />
         <SessionCreateForm courses={courses} busy={busy === "session-create"} onSubmit={(payload) => doMutate({ operation: "session-create", action: "session_upsert", payload, success: "Session saved.", invalidate: ["catalog", "analytics"] })} />
@@ -598,14 +681,27 @@ export function CatalogSection() {
         <div className={styles.courseNumber} aria-hidden="true">{String(index + 1).padStart(2, "0")}</div><StatusBadge status={statusFor(course.status)} />
         <h3>{course.title}</h3><p>{course.summary}</p>
         <div className={styles.courseFooter}><span className={styles.coursePrice}><strong>{money(course.price_cents, course.currency)}</strong><button className={styles.priceEditButton} type="button" onClick={(event) => { const editor = event.currentTarget.closest(`.${styles.courseCard}`)?.querySelector<HTMLDetailsElement>(`details[data-price-editor]`); if (editor) { editor.open = true; editor.scrollIntoView({ block: "nearest" }); } }}>Edit price for {course.title}</button></span><span>{course.duration_minutes} minutes</span></div>
-        <CoursePriceEditor course={course} busy={busy === `course-price-${course.id}`} onSave={(priceCents) => doMutate({ operation: `course-price-${course.id}`, action: course.stripe_product_id ? "course_price_update" : "course_upsert", payload: course.stripe_product_id ? { course_id: course.id, price_cents: priceCents } : coursePayload({ ...course, price_cents: priceCents }, course.status), success: `Price updated for ${course.title}.`, invalidate: ["catalog", "analytics"] })} />
-        <CoursePaymentForm course={course} busy={busy === `course-payment-${course.id}`} onSave={(productId, priceId) => doMutate({ operation: `course-payment-${course.id}`, action: "course_upsert", payload: coursePayload(course, course.status, { productId, priceId }), success: `Stripe pricing verified and saved for ${course.title}.`, invalidate: ["catalog"] })} />
+        <CatalogPriceEditor item={course} label="course" busy={busy === `course-price-${course.id}`} onSave={(priceCents) => doMutate({ operation: `course-price-${course.id}`, action: course.stripe_product_id ? "course_price_update" : "course_upsert", payload: course.stripe_product_id ? { course_id: course.id, price_cents: priceCents } : coursePayload({ ...course, price_cents: priceCents }, course.status), success: `Price updated for ${course.title}.`, invalidate: ["catalog", "analytics"] })} />
+        <CatalogPaymentForm item={course} busy={busy === `course-payment-${course.id}`} onSave={(productId, priceId) => doMutate({ operation: `course-payment-${course.id}`, action: "course_upsert", payload: coursePayload(course, course.status, { productId, priceId }), success: `Stripe pricing verified and saved for ${course.title}.`, invalidate: ["catalog"] })} />
         <InlineSelect label={`Change status for ${course.title}`} value={course.status} options={["draft", "published", "archived"]} busy={busy === `course-${course.id}`} onSave={(status) => doMutate({ operation: `course-${course.id}`, action: "course_upsert", payload: coursePayload(course, status), success: `${course.title} is now ${status}.`, invalidate: ["catalog", "analytics"] })} />
       </Panel>)}</div> : error ? null : <EmptyState title="No courses yet" description="Create the first draft course with the form above." />}
       <Panel className={styles.tablePanel}>
         <div className={styles.panelHeaderWithAction}><div><p className={styles.panelKicker}>Schedule</p><h3>All sessions</h3></div></div>
         {sessions.length ? <TableRegion label="Workshop sessions"><table className={styles.table}><caption className={styles.srOnly}>Workshop sessions</caption><thead><tr><th scope="col">Date</th><th scope="col">Workshop</th><th scope="col">Format</th><th scope="col">Capacity</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead><tbody>{sessions.map((session) => <tr id={`session-${session.id}`} key={session.id}><td>{dateTime(session.start_at)}</td><td><strong>{session.courseTitle}</strong><small>{session.venue || "Online"}</small></td><td>{session.format.replaceAll("_", " ")}</td><td>{session.capacity}</td><td><StatusBadge status={statusFor(session.status)} /></td><td><div className={styles.tableActions}><button className={styles.tableButton} type="button" onClick={() => setSelectedSession(session)} aria-label={`View or edit ${session.courseTitle} on ${dateTime(session.start_at)}`}>View / edit</button><InlineSelect compact label={`Change session status for ${session.courseTitle} on ${dateTime(session.start_at)}`} value={session.status} options={["draft", "scheduled", "sold_out", "cancelled", "completed"]} busy={busy === `session-${session.id}`} onSave={(status) => doMutate({ operation: `session-${session.id}`, action: "session_upsert", payload: sessionPayload(session, status), success: "Session status updated.", invalidate: ["catalog", "analytics"] })} /></div></td></tr>)}</tbody></table></TableRegion> : <EmptyState title="No sessions yet" description="Add a draft session when a workshop date is ready." />}
       </Panel>
+      <div className={styles.panelHeaderWithAction}>
+        <div><p className={styles.panelKicker}>Plate &amp; Post</p><h2>Fixed service packages</h2></div>
+      </div>
+      <p className={styles.formNote}>Draft packages are available only to owner/admin staff for sandbox testing. Do not publish until package deliverables, turnaround, revisions, travel and product handling, usage rights, VAT treatment, and live Stripe configuration are approved.</p>
+      {services.length ? <div className={styles.courseGrid}>{services.map((service, index) => <Panel className={styles.courseCard} key={service.catalog_item_id}>
+        <div className={styles.courseNumber} aria-hidden="true">P{String(index + 1).padStart(2, "0")}</div><StatusBadge status={statusFor(service.status)} />
+        <h3>{service.title}</h3><p>{service.summary}</p>
+        <div className={styles.courseFooter}><span className={styles.coursePrice}><strong>{money(service.price_cents, service.currency)}</strong><button className={styles.priceEditButton} type="button" onClick={(event) => { const editor = event.currentTarget.closest(`.${styles.courseCard}`)?.querySelector<HTMLDetailsElement>(`details[data-price-editor]`); if (editor) { editor.open = true; editor.scrollIntoView({ block: "nearest" }); } }}>Edit price for {service.title}</button></span><span>Manual scheduling</span></div>
+        <CatalogPriceEditor item={service} label="package" busy={busy === `service-price-${service.catalog_item_id}`} onSave={(priceCents) => doMutate({ operation: `service-price-${service.catalog_item_id}`, action: service.stripe_product_id ? "service_offering_price_update" : "service_offering_upsert", payload: service.stripe_product_id ? { catalog_item_id: service.catalog_item_id, price_cents: priceCents } : serviceOfferingPayload({ ...service, price_cents: priceCents }), success: `Price updated for ${service.title}.`, invalidate: ["catalog"] })} />
+        <CatalogPaymentForm item={service} busy={busy === `service-payment-${service.catalog_item_id}`} onSave={(productId, priceId) => doMutate({ operation: `service-payment-${service.catalog_item_id}`, action: "service_offering_upsert", payload: serviceOfferingPayload(service, service.status, { productId, priceId }), success: `Stripe pricing verified and saved for ${service.title}.`, invalidate: ["catalog"] })} />
+        <ServiceOfferingEditor service={service} busy={busy === `service-content-${service.catalog_item_id}`} onSave={(payload) => doMutate({ operation: `service-content-${service.catalog_item_id}`, action: "service_offering_upsert", payload, success: `${service.title} content updated.`, invalidate: ["catalog"] })} />
+        <InlineSelect label={`Change status for ${service.title}`} value={service.status} options={["draft", "published", "archived"]} busy={busy === `service-status-${service.catalog_item_id}`} onSave={(status) => doMutate({ operation: `service-status-${service.catalog_item_id}`, action: "service_offering_upsert", payload: serviceOfferingPayload(service, serviceOfferingStatus(status)), success: `${service.title} is now ${status}.`, invalidate: ["catalog"] })} />
+      </Panel>)}</div> : error ? null : <EmptyState title="No service packages" description="The three seeded Plate & Post drafts should appear after the BNC commerce migration is applied." />}
       {selectedSession ? <SessionDialog key={selectedSession.id} session={selectedSession} courses={courses} busy={busy === `session-edit-${selectedSession.id}`} onClose={() => setSelectedSession(null)} onSave={async (payload) => { const saved = await doMutate({ operation: `session-edit-${selectedSession.id}`, action: "session_upsert", payload, success: "Session updated.", invalidate: ["catalog", "analytics"] }); if (saved) setSelectedSession(null); return saved; }} /> : null}
     </section>
   );
@@ -639,14 +735,38 @@ function CourseCreateForm({ busy, onSubmit }: { busy: boolean; onSubmit: (payloa
   return <Panel className={styles.formPanel}><details><summary>Create a draft course</summary><form className={styles.adminForm} onSubmit={(event) => void submit(event)}><div className={styles.formGrid}><label>Title<input name="title" required maxLength={240} /></label><label>URL slug<input name="slug" required maxLength={120} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" aria-describedby="slug-help" placeholder="practical-ai-basics" /></label><label className={styles.fullField}>Summary<input name="summary" required maxLength={1000} /></label><label className={styles.fullField}>Description<textarea name="description" required rows={3} maxLength={10000} /></label><label>Audience<input name="audience" required maxLength={2000} /></label><label>Level<input name="level" required maxLength={120} defaultValue="Beginner-friendly" /></label><label>Duration (minutes)<input name="duration_minutes" type="number" min="30" max="1440" required defaultValue="180" /></label><label>Price per person (EUR)<input name="price_euros" type="number" min="1" step="0.01" required /></label><label className={styles.fullField}>Outcomes, one per line<textarea name="outcomes" rows={3} required maxLength={10019} /></label><label className={styles.fullField}>Agenda, one step per line as Title | Detail<textarea name="agenda" rows={3} required maxLength={12419} placeholder="Start with the work | Choose a real task and define a useful result." /></label></div><p className={styles.formNote} id="slug-help">Use lower-case letters, numbers, and hyphens. Use no more than 20 outcomes or agenda steps.</p><button className={styles.primaryButton} type="submit" disabled={busy}>{busy ? "Creating…" : "Create draft course"}</button></form></details></Panel>;
 }
 
-function CoursePaymentForm({ course, busy, onSave }: { course: CourseRecord; busy: boolean; onSave: (productId: string, priceId: string) => Promise<boolean> }) {
-  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const values = new FormData(event.currentTarget); await onSave(String(values.get("stripe_product_id") ?? "").trim(), String(values.get("stripe_price_id") ?? "").trim()); }
-  return <details className={styles.quoteForm}><summary>Stripe pricing</summary><form className={styles.adminForm} onSubmit={(event) => void submit(event)}><label>Product ID<input name="stripe_product_id" required pattern="prod_[A-Za-z0-9]+" defaultValue={course.stripe_product_id ?? ""} /></label><label>Price ID<input name="stripe_price_id" required pattern="price_[A-Za-z0-9]+" defaultValue={course.stripe_price_id ?? ""} /></label><button className={styles.primaryButton} type="submit" disabled={busy}>{busy ? "Verifying…" : "Verify and save"}</button><p className={styles.formNote}>The server verifies the active EUR Price matches {money(course.price_cents, course.currency)} before saving.</p></form></details>;
+type PricedCatalogItem = Pick<CourseRecord, "title" | "price_cents" | "currency" | "stripe_product_id" | "stripe_price_id">;
+
+function ServiceOfferingEditor({ service, busy, onSave }: { service: ServiceOfferingRecord; busy: boolean; onSave: (payload: Record<string, unknown>) => Promise<boolean> }) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    const duration = String(values.get("duration_minutes") ?? "").trim();
+    await onSave({
+      ...serviceOfferingPayload(service),
+      slug: String(values.get("slug") ?? "").trim().toLowerCase(),
+      title: String(values.get("title") ?? "").trim(),
+      summary: String(values.get("summary") ?? "").trim(),
+      description: String(values.get("description") ?? "").trim(),
+      outcomes: String(values.get("outcomes") ?? "").split("\n").map((value) => value.trim()).filter(Boolean),
+      audience: String(values.get("audience") ?? "").trim(),
+      duration_minutes: duration ? Number(duration) : null,
+      seo_title: String(values.get("seo_title") ?? "").trim(),
+      seo_description: String(values.get("seo_description") ?? "").trim(),
+    });
+  }
+
+  return <details className={styles.quoteForm}><summary>Edit package content</summary><form className={styles.adminForm} onSubmit={(event) => void submit(event)}><div className={styles.formGrid}><label>Title<input name="title" required maxLength={240} defaultValue={service.title} /></label><label>URL slug<input name="slug" required maxLength={120} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" defaultValue={service.slug} /></label><label className={styles.fullField}>Summary<input name="summary" required maxLength={1000} defaultValue={service.summary} /></label><label className={styles.fullField}>Description<textarea name="description" required rows={4} maxLength={10000} defaultValue={service.description} /></label><label className={styles.fullField}>Deliverables, one per line<textarea name="outcomes" rows={4} maxLength={10019} defaultValue={service.outcomes.join("\n")} /></label><label className={styles.fullField}>Audience<input name="audience" required maxLength={2000} defaultValue={service.audience} /></label><label>Duration (minutes, optional)<input name="duration_minutes" type="number" min="1" max="10080" defaultValue={service.duration_minutes ?? ""} /></label><label>SEO title<input name="seo_title" maxLength={240} defaultValue={service.seo_title ?? ""} /></label><label className={styles.fullField}>SEO description<textarea name="seo_description" rows={2} maxLength={1000} defaultValue={service.seo_description ?? ""} /></label></div><button className={styles.primaryButton} type="submit" disabled={busy}>{busy ? "Saving…" : "Save package content"}</button><p className={styles.formNote}>Fulfilment remains manual scheduling. Stripe identifiers, price, visibility, and publication status are preserved by this editor.</p></form></details>;
 }
 
-function CoursePriceEditor({ course, busy, onSave }: { course: CourseRecord; busy: boolean; onSave: (priceCents: number) => Promise<boolean> }) {
+function CatalogPaymentForm({ item, busy, onSave }: { item: PricedCatalogItem; busy: boolean; onSave: (productId: string, priceId: string) => Promise<boolean> }) {
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const values = new FormData(event.currentTarget); await onSave(String(values.get("stripe_product_id") ?? "").trim(), String(values.get("stripe_price_id") ?? "").trim()); }
+  return <details className={styles.quoteForm}><summary>Stripe pricing</summary><form className={styles.adminForm} onSubmit={(event) => void submit(event)}><label>Product ID<input name="stripe_product_id" required pattern="prod_[A-Za-z0-9]+" defaultValue={item.stripe_product_id ?? ""} /></label><label>Price ID<input name="stripe_price_id" required pattern="price_[A-Za-z0-9]+" defaultValue={item.stripe_price_id ?? ""} /></label><button className={styles.primaryButton} type="submit" disabled={busy}>{busy ? "Verifying…" : "Verify and save"}</button><p className={styles.formNote}>The server verifies the active one-time EUR Price matches {money(item.price_cents, item.currency)} and uses inclusive tax behavior before saving.</p></form></details>;
+}
+
+function CatalogPriceEditor({ item, label, busy, onSave }: { item: PricedCatalogItem; label: string; busy: boolean; onSave: (priceCents: number) => Promise<boolean> }) {
   async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const euros = Number(new FormData(event.currentTarget).get("price_euros")); if (Number.isFinite(euros)) await onSave(Math.round(euros * 100)); }
-  return <details className={styles.priceEditor} data-price-editor><summary>Adjust course price</summary><form className={styles.adminForm} onSubmit={(event) => void submit(event)}><label>Price per person (EUR)<input name="price_euros" type="number" min="0.01" step="0.01" required defaultValue={(course.price_cents / 100).toFixed(2)} /></label><button className={styles.primaryButton} type="submit" disabled={busy}>{busy ? "Updating…" : "Update price"}</button><p className={styles.formNote}>{course.stripe_product_id ? "A new immutable, VAT-inclusive Stripe Price will be created for future checkouts. Existing payments are unchanged." : "This draft has no Stripe Product yet, so only the catalogue amount will change."}</p></form></details>;
+  return <details className={styles.priceEditor} data-price-editor><summary>Adjust {label} price</summary><form className={styles.adminForm} onSubmit={(event) => void submit(event)}><label>Price (EUR)<input name="price_euros" type="number" min="0.01" step="0.01" required defaultValue={(item.price_cents / 100).toFixed(2)} /></label><button className={styles.primaryButton} type="submit" disabled={busy}>{busy ? "Updating…" : "Update price"}</button><p className={styles.formNote}>{item.stripe_product_id ? "A new immutable, VAT-inclusive Stripe Price will be created for future checkouts. Existing payments are unchanged." : "This draft has no Stripe Product yet, so only the catalogue amount will change."}</p></form></details>;
 }
 
 function SessionCreateForm({ courses, busy, onSubmit }: { courses: CourseRecord[]; busy: boolean; onSubmit: (payload: Record<string, unknown>) => Promise<boolean> }) {
@@ -667,10 +787,36 @@ function InlineSelectControl({ label, value, options, busy, onSave, compact = fa
   return <div className={`${styles.inlineControl} ${compact ? styles.inlineControlCompact : ""}`}><label><span className={styles.srOnly}>{label}</span><select aria-label={label} value={selected} onChange={(event) => setSelected(event.target.value)}>{options.map((option) => <option key={option} value={option}>{statusFor(option).label}</option>)}</select></label><button type="button" disabled={busy || selected === value} onClick={() => void onSave(selected)} aria-label={`Save ${label}`}>{busy ? "Saving…" : "Save"}</button></div>;
 }
 
+function serviceOrderStatusOptions(order: ServiceOrderRecord) {
+  const transitions: Record<ServiceOrderRecord["fulfillment_status"], ServiceOrderRecord["fulfillment_status"][]> = {
+    new: ["contacted", "cancelled"],
+    contacted: ["scheduled", "cancelled"],
+    scheduled: ["in_progress", "cancelled"],
+    in_progress: ["delivered", "cancelled"],
+    delivered: [],
+    cancelled: [],
+  };
+  return [order.fulfillment_status, ...transitions[order.fulfillment_status]];
+}
+
 export function BookingsSection() {
+  const { client, busy, mutate } = useAdminWorkspace();
   const { items: enrollments, error, loading, reload, hasMore, loadingMore, loadMore } = useStaffPagedResource("bookings", "enrollments");
+  const ordersLoader = useCallback(async () => arrayFrom<ServiceOrderRecord>(await invokeAdmin<unknown>(client, "service_orders_list", { limit: 100 }), "orders"), [client]);
+  const { data: orderData, error: orderError, loading: ordersLoading, reload: reloadOrders } = useAdminResource("orders", ordersLoader);
+  const orders = orderData ?? [];
   const confirmed = enrollments.filter((enrollment) => enrollment.status === "confirmed");
-  return <section className={styles.section} aria-labelledby="bookings-title"><SectionHeader eyebrow="Enrolment" title="Bookings" description="Payment-confirmed and pending enrolments returned by the protected staff endpoint." action={<RefreshButton onClick={reload} loading={loading} />} /><SectionError message={error} /><div className={styles.bookingSummary}><div><span>Records shown</span><strong>{enrollments.length}</strong></div><div><span>Confirmed</span><strong>{confirmed.length}</strong></div><div><span>Confirmed value</span><strong>{money(confirmed.reduce((sum, enrollment) => sum + enrollment.amount_cents, 0))}</strong></div></div><Panel className={styles.tablePanel}>{enrollments.length ? <><TableRegion label="Recent workshop bookings"><table className={styles.table}><caption className={styles.srOnly}>Recent workshop bookings</caption><thead><tr><th scope="col">Attendee</th><th scope="col">Workshop</th><th scope="col">Session</th><th scope="col">Booked</th><th scope="col">Amount</th><th scope="col">Status</th></tr></thead><tbody>{enrollments.map((enrollment) => <tr key={enrollment.id}><td><strong>{enrollment.attendee_name || "Name not supplied"}</strong><small>{enrollment.attendee_email}</small></td><td>{enrollment.course_title}</td><td>{dateTime(enrollment.start_at)}</td><td>{dateTime(enrollment.booked_at)}</td><td>{money(enrollment.amount_cents, enrollment.currency)}</td><td><StatusBadge status={statusFor(enrollment.status)} /></td></tr>)}</tbody></table></TableRegion><LoadMoreButton hasMore={hasMore} loading={loadingMore} onClick={loadMore} label="Load earlier bookings" /></> : error ? null : <EmptyState title="No bookings yet" description="Verified Stripe webhook enrolments will appear here." />}</Panel></section>;
+  const paidOrders = orders.filter((order) => order.payment_status === "paid");
+  const refresh = () => { reload(); reloadOrders(); };
+
+  return <section className={styles.section} aria-labelledby="bookings-title">
+    <SectionHeader eyebrow="Customer purchases" title="Bookings & orders" description="Workshop enrolments and Plate & Post service orders share one protected operations view." action={<RefreshButton onClick={refresh} loading={loading || ordersLoading} />} />
+    <SectionError message={error} />
+    <SectionError message={orderError} />
+    <div className={styles.bookingSummary}><div><span>Workshop bookings shown</span><strong>{enrollments.length}</strong></div><div><span>Paid service orders</span><strong>{paidOrders.length}</strong></div><div><span>Paid value shown</span><strong>{money(confirmed.reduce((sum, enrollment) => sum + enrollment.amount_cents, 0) + paidOrders.reduce((sum, order) => sum + order.amount_cents, 0))}</strong></div></div>
+    <Panel className={styles.tablePanel}><PanelHeader kicker="Clearstep AI" title="Workshop bookings" />{enrollments.length ? <><TableRegion label="Recent workshop bookings"><table className={styles.table}><caption className={styles.srOnly}>Recent workshop bookings</caption><thead><tr><th scope="col">Attendee</th><th scope="col">Workshop</th><th scope="col">Session</th><th scope="col">Booked</th><th scope="col">Amount</th><th scope="col">Status</th></tr></thead><tbody>{enrollments.map((enrollment) => <tr key={enrollment.id}><td><strong>{enrollment.attendee_name || "Name not supplied"}</strong><small>{enrollment.attendee_email}</small></td><td>{enrollment.course_title}</td><td>{dateTime(enrollment.start_at)}</td><td>{dateTime(enrollment.booked_at)}</td><td>{money(enrollment.amount_cents, enrollment.currency)}</td><td><StatusBadge status={statusFor(enrollment.status)} /></td></tr>)}</tbody></table></TableRegion><LoadMoreButton hasMore={hasMore} loading={loadingMore} onClick={loadMore} label="Load earlier bookings" /></> : error ? null : <EmptyState title="No workshop bookings yet" description="Verified Stripe webhook enrolments will appear here." />}</Panel>
+    <Panel className={styles.tablePanel}><PanelHeader kicker="Plate & Post" title="Service orders" />{orders.length ? <TableRegion label="Recent Plate and Post orders"><table className={styles.table}><caption className={styles.srOnly}>Recent Plate and Post service orders</caption><thead><tr><th scope="col">Customer</th><th scope="col">Package</th><th scope="col">Ordered</th><th scope="col">Amount</th><th scope="col">Payment</th><th scope="col">Fulfilment</th><th scope="col">Action</th></tr></thead><tbody>{orders.map((order) => { const options = serviceOrderStatusOptions(order); return <tr key={order.id}><td><strong>{order.customer_email}</strong><small>Ref {order.id.slice(0, 8).toUpperCase()}</small></td><td>{order.service_title}</td><td>{dateTime(order.ordered_at)}</td><td>{money(order.amount_cents, order.currency)}</td><td><StatusBadge status={statusFor(order.payment_status)} /></td><td><StatusBadge status={statusFor(order.fulfillment_status)} /></td><td>{options.length > 1 ? <InlineSelect compact label={`Change fulfilment for ${order.service_title}, order ${order.id.slice(0, 8)}`} value={order.fulfillment_status} options={options} busy={busy === `service-order-${order.id}`} onSave={(status) => mutate({ operation: `service-order-${order.id}`, action: "service_order_fulfillment_update", payload: { order_id: order.id, status }, success: `${order.service_title} fulfilment updated.`, invalidate: ["orders"] })} /> : "—"}</td></tr>; })}</tbody></table></TableRegion> : orderError ? null : <EmptyState title="No service orders yet" description="Verified Plate & Post payments will appear here for manual scheduling." />}</Panel>
+  </section>;
 }
 
 export function WaitlistSection() {
@@ -795,25 +941,25 @@ export function CustomerRequestsSection() {
       <SectionHeader
         eyebrow={role === "owner" ? "Owner access" : "Admin access"}
         title="Customer requests"
-        description={role === "owner" ? "Review privacy requests and cancellation requests returned by the protected queue." : "Review cancellation requests returned by the protected queue."}
+        description={role === "owner" ? "Review privacy, cancellation, and purchase-change requests returned by the protected queue." : "Review cancellation and purchase-change requests returned by the protected queue."}
         action={<RefreshButton onClick={reload} loading={loading} />}
       />
       <SectionError message={error} />
       <Panel className={styles.tablePanel}>
         {requests.length ? <><TableRegion label="Customer requests"><table className={styles.table}>
-          <caption className={styles.srOnly}>Customer privacy and cancellation requests</caption>
+          <caption className={styles.srOnly}>Customer privacy, cancellation, and purchase-change requests</caption>
           <thead><tr><th scope="col">Kind</th><th scope="col">Submitted</th><th scope="col">Details</th><th scope="col">Status</th><th scope="col">Resolution</th></tr></thead>
           <tbody>{requests.map((request) => {
             const operation = `customer-request-${request.id}`;
             return <tr key={request.id}>
-              <td><strong>{statusFor(request.kind).label}</strong><small>{request.enrollment_id ? `Booking ${request.enrollment_id}` : "No booking reference"}</small></td>
+              <td><strong>{statusFor(request.kind).label}</strong><small>{request.enrollment_id ? `Workshop booking ${request.enrollment_id}` : request.service_order_id ? `Service order ${request.service_order_id}` : "No purchase reference"}</small></td>
               <td>{dateTime(request.created_at)}</td>
               <td>{request.details || "No additional details"}</td>
               <td><InlineSelect label={`Change status for ${request.kind} request submitted ${dateTime(request.created_at)}`} value={request.status} options={["submitted", "in_review", "awaiting_customer", "completed", "declined"]} busy={busy === operation} onSave={(status) => mutate({ operation, action: "customer_request_update", payload: { request_id: request.id, status, resolution_note: request.resolution_note ?? "" }, success: "Customer request updated.", invalidate: ["requests"] })} /></td>
               <td><ResolutionNoteForm request={request} busy={busy === operation} onSave={(resolutionNote) => mutate({ operation, action: "customer_request_update", payload: { request_id: request.id, status: request.status, resolution_note: resolutionNote }, success: "Customer request resolution note updated.", invalidate: ["requests"] })} /></td>
             </tr>;
           })}</tbody>
-        </table></TableRegion><LoadMoreButton hasMore={hasMore} loading={loadingMore} onClick={loadMore} label="Load earlier customer requests" /></> : error ? null : <EmptyState title="No customer requests" description="New privacy and cancellation requests will appear here." />}
+        </table></TableRegion><LoadMoreButton hasMore={hasMore} loading={loadingMore} onClick={loadMore} label="Load earlier customer requests" /></> : error ? null : <EmptyState title="No customer requests" description="New privacy, cancellation, and purchase-change requests will appear here." />}
       </Panel>
     </section>
   );
@@ -886,7 +1032,7 @@ export function TeamSection() {
 
 function InviteForm({ busy, onInvite }: { busy: boolean; onInvite: (email: string, role: "admin" | "analyst") => Promise<boolean> }) {
   async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const form = event.currentTarget; const values = new FormData(form); if (await onInvite(String(values.get("email") ?? "").trim(), String(values.get("role")) as "admin" | "analyst")) form.reset(); }
-  return <><p className={styles.panelKicker}>Invite someone</p><h3>Add a team member</h3><p>They receive a single-use link that expires after seven days and must accept while signed in with the invited verified email.</p><form className={styles.inviteForm} onSubmit={(event) => void submit(event)}><label>Work email<input name="email" type="email" required autoComplete="email" /></label><label>Role<select name="role" defaultValue="analyst"><option value="analyst">Analyst · Analytics only</option><option value="admin">Admin · Workshops and bookings</option></select></label><button className={styles.primaryButton} type="submit" disabled={busy}>{busy ? "Sending…" : "Send invitation"}</button></form></>;
+  return <><p className={styles.panelKicker}>Invite someone</p><h3>Add a team member</h3><p>They receive a single-use link that expires after seven days and must accept while signed in with the invited verified email.</p><form className={styles.inviteForm} onSubmit={(event) => void submit(event)}><label>Work email<input name="email" type="email" required autoComplete="email" /></label><label>Role<select name="role" defaultValue="analyst"><option value="analyst">Analyst · Analytics only</option><option value="admin">Admin · Catalog, bookings, and orders</option></select></label><button className={styles.primaryButton} type="submit" disabled={busy}>{busy ? "Sending…" : "Send invitation"}</button></form></>;
 }
 
 function MemberControl({ member, busy, onSave }: { member: StaffMemberRecord; busy: boolean; onSave: (role: StaffRole, status: string) => Promise<boolean> }) {

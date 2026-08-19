@@ -7,11 +7,11 @@ import { getWorkshopCatalog } from "@/lib/workshops";
 export const metadata: Metadata = {
   title: "Practical AI workshops",
   description: "Find a welcoming, hands-on Clearstep AI workshop in Amsterdam, Utrecht, or live online.",
-  alternates: { canonical: "/workshops" },
+  alternates: { canonical: "/clearstep/workshops" },
   openGraph: {
     title: "Practical AI workshops | Clearstep AI",
     description: "Small groups, useful methods, and real workflows you can use right away.",
-    url: "/workshops",
+    url: "/clearstep/workshops",
   },
 };
 
@@ -19,7 +19,7 @@ export default async function WorkshopsPage() {
   const catalog = await getWorkshopCatalog();
 
   return (
-    <PublicPage>
+    <PublicPage brandKey="clearstep">
       <PageIntro eyebrow="Upcoming sessions" title="Choose a workshop that starts with real work.">
         <p className="m-0">
           Every Clearstep workshop is practical, small-group, and designed for people who want AI to feel more useful—not more complicated.

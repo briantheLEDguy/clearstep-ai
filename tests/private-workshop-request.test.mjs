@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const componentUrl = new URL("../components/private-workshop-request-form.tsx", import.meta.url);
-const pageUrl = new URL("../app/private-workshops/page.tsx", import.meta.url);
+const pageUrl = new URL("../app/clearstep/private-workshops/page.tsx", import.meta.url);
 
 test("collects the complete private workshop brief with accessible form states", async () => {
   const source = await readFile(componentUrl, "utf8");

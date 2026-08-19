@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckoutLegalAcceptance } from "@/components/checkout-legal-acceptance";
+import { parseCheckoutResponse } from "@/lib/checkout";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { functionErrorMessage, unwrapFunctionData } from "@/lib/supabase/functions";
 import { COMPANY_DETAILS } from "@/shared/company-details";
@@ -41,7 +42,7 @@ export function BookingPanel({ workshopSlug, workshopTitle, sessionId, seatsLeft
 
     const { data: sessionData } = await client.auth.getSession();
     if (!sessionData.session) {
-      const next = `/workshops/${workshopSlug}--${sessionId}`;
+      const next = `/clearstep/workshops/${workshopSlug}--${sessionId}`;
       router.push(`/sign-in?next=${encodeURIComponent(next)}`);
       return;
     }
@@ -50,7 +51,7 @@ export function BookingPanel({ workshopSlug, workshopTitle, sessionId, seatsLeft
     const { data, error } = await client.functions.invoke(functionName, {
       body: soldOut
         ? { workshopSlug, sessionRef: sessionId }
-        : { workshopSlug, sessionRef: sessionId, legalAccepted: true },
+        : { targetType: "workshop", workshopSlug, sessionRef: sessionId, legalAccepted: true },
     });
 
     if (error) {
@@ -65,20 +66,14 @@ export function BookingPanel({ workshopSlug, workshopTitle, sessionId, seatsLeft
       return;
     }
 
-    const result = unwrapFunctionData<{ checkoutUrl?: unknown; url?: unknown }>(data);
-    const redirectUrl = typeof result?.checkoutUrl === "string"
-      ? result.checkoutUrl
-      : typeof result?.url === "string"
-        ? result.url
-        : null;
-
-    if (!redirectUrl) {
+    const result = parseCheckoutResponse(unwrapFunctionData(data));
+    if (!result) {
       setState("error");
-      setMessage("Checkout did not return a payment link. Please try again.");
+      setMessage("Checkout returned an invalid payment response. Please try again.");
       return;
     }
 
-    window.location.assign(redirectUrl);
+    window.location.assign(result.checkoutUrl);
   }
 
   return (

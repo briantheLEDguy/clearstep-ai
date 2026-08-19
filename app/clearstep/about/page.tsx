@@ -5,12 +5,12 @@ import { PublicPage } from "@/components/public-page";
 export const metadata: Metadata = {
   title: "About Clearstep",
   description: "Clearstep makes practical AI easier to understand, try, and use responsibly in everyday business work.",
-  alternates: { canonical: "/about" },
+  alternates: { canonical: "/clearstep/about" },
 };
 
 export default function AboutPage() {
   return (
-    <PublicPage>
+    <PublicPage brandKey="clearstep">
       <PageIntro eyebrow="About Clearstep" title="AI should make the next step clearer—not create more noise.">
         <p className="m-0">Clearstep was created for people who are curious about AI but do not want hype, jargon, or a tool demo that disappears from memory the next day.</p>
       </PageIntro>

@@ -106,6 +106,56 @@ export type PrivateRequestRecord = {
   quotes_truncated?: boolean;
 };
 
+export type ServiceOfferingRecord = {
+  catalog_item_id: string;
+  service_line_id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  description: string;
+  outcomes: string[];
+  audience: string;
+  duration_minutes: number | null;
+  fulfillment_method: "manual_scheduling";
+  price_cents: number;
+  currency: "EUR";
+  stripe_product_id: string | null;
+  stripe_price_id: string | null;
+  visibility: "public" | "private";
+  status: "draft" | "published" | "archived";
+  business_unit: "plate_and_post";
+  offering_type: "service_package";
+  seo_title: string | null;
+  seo_description: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ServiceOrderRecord = {
+  id: string;
+  checkout_attempt_id: string;
+  service_line_id: string;
+  catalog_item_id: string;
+  user_id: string;
+  customer_email: string;
+  service_line_slug: string;
+  service_slug: string;
+  service_title: string;
+  fulfillment_method: "manual_scheduling";
+  payment_status: "pending" | "paid" | "failed" | "refunded";
+  fulfillment_status: "new" | "contacted" | "scheduled" | "in_progress" | "delivered" | "cancelled";
+  amount_cents: number;
+  currency: "EUR";
+  stripe_checkout_session_id: string;
+  stripe_payment_intent_id: string | null;
+  ordered_at: string;
+  paid_at: string | null;
+  completed_at: string | null;
+  refunded_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type AnalyticsSummary = {
   from: string;
   to: string;
@@ -165,6 +215,18 @@ export type AuditRecord = {
   target_type: string;
   target_id: string | null;
   occurred_at: string;
+};
+
+export type ServiceAnalyticsSummary = {
+  service_line_id: "plate_and_post";
+  orders_started: number;
+  paid_orders: number;
+  pending_orders: number;
+  refunded_orders: number;
+  gross_revenue_cents: number;
+  refunded_cents: number;
+  net_revenue_cents: number;
+  currency: "EUR";
 };
 
 export type IntegrationRecord = {
@@ -234,16 +296,16 @@ export function dateOnly(value: string | null | undefined) {
 export function statusFor(value: string): AdminStatus {
   const normalized = value.replaceAll("_", " ");
   const label = normalized.replace(/\b\w/g, (letter) => letter.toUpperCase());
-  if (["active", "accepted", "completed", "confirmed", "healthy", "paid", "published", "scheduled", "sent", "won"].includes(value)) {
+  if (["active", "accepted", "completed", "confirmed", "delivered", "healthy", "paid", "published", "scheduled", "sent", "won"].includes(value)) {
     return { label, tone: "success" };
   }
   if (["failed", "failing", "lost", "revoked", "cancelled"].includes(value)) {
     return { label, tone: "danger" };
   }
-  if (["degraded", "offered", "pending", "pending_payment", "quoted", "retrying", "sold_out", "waiting"].includes(value)) {
+  if (["degraded", "offered", "pending", "pending_payment", "quoted", "refunded", "retrying", "sold_out", "waiting"].includes(value)) {
     return { label, tone: "warning" };
   }
-  if (["contacted", "qualified", "new"].includes(value)) {
+  if (["contacted", "in_progress", "qualified", "new"].includes(value)) {
     return { label, tone: "info" };
   }
   return { label, tone: "neutral" };

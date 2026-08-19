@@ -7,9 +7,9 @@ const source = (path) => readFile(new URL(path, import.meta.url), "utf8");
 test("the Pages build reads the sanitized Supabase workshop catalog", async () => {
   const [catalog, home, listing, detail, sitemap, a11yBuild] = await Promise.all([
     source("../lib/workshops.ts"),
-    source("../app/page.tsx"),
-    source("../app/workshops/page.tsx"),
-    source("../app/workshops/[slug]/page.tsx"),
+    source("../app/clearstep/page.tsx"),
+    source("../app/clearstep/workshops/page.tsx"),
+    source("../app/clearstep/workshops/[slug]/page.tsx"),
     source("../app/sitemap.ts"),
     source("../scripts/build-a11y.mjs"),
   ]);
@@ -60,9 +60,9 @@ test("catalog mapping validates booking, price, schedule, and capacity fields", 
 test("the public frontend contains no hardcoded catalog inventory", async () => {
   const files = await Promise.all([
     source("../lib/workshops.ts"),
-    source("../app/page.tsx"),
-    source("../app/workshops/page.tsx"),
-    source("../app/workshops/[slug]/page.tsx"),
+    source("../app/clearstep/page.tsx"),
+    source("../app/clearstep/workshops/page.tsx"),
+    source("../app/clearstep/workshops/[slug]/page.tsx"),
     source("../app/sitemap.ts"),
     source("../components/workshop-card.tsx"),
   ]);
@@ -79,7 +79,7 @@ test("every exported workshop URL stays bound to its session", async () => {
     source("../lib/workshops.ts"),
     source("../lib/workshop-route.ts"),
     source("../components/workshop-card.tsx"),
-    source("../app/workshops/[slug]/page.tsx"),
+    source("../app/clearstep/workshops/[slug]/page.tsx"),
     source("../components/booking-panel.tsx"),
     source("../app/sitemap.ts"),
   ]);
@@ -90,14 +90,15 @@ test("every exported workshop URL stays bound to its session", async () => {
   assert.match(route, /parseWorkshopRouteSegment/u);
   assert.match(detail, /getWorkshopByRouteSegment\(slug\)/u);
   assert.match(detail, /generateStaticParams/u);
-  assert.match(booking, /`\/workshops\/\$\{workshopSlug\}--\$\{sessionId\}`/u);
-  assert.match(sitemap, /catalog\.workshops\.map[\s\S]*workshopRouteSegment\(workshop\)/u);
+  assert.match(booking, /`\/clearstep\/workshops\/\$\{workshopSlug\}--\$\{sessionId\}`/u);
+  assert.match(booking, /targetType:\s*"workshop"/u);
+  assert.match(sitemap, /workshopCatalog\.workshops\.map[\s\S]*workshopRouteSegment\(workshop\)/u);
 });
 
 test("admin-editable workshop copy cannot break out of JSON-LD scripts", async () => {
   const [serializer, detail, layout] = await Promise.all([
     source("../lib/json-ld.ts"),
-    source("../app/workshops/[slug]/page.tsx"),
+    source("../app/clearstep/workshops/[slug]/page.tsx"),
     source("../app/layout.tsx"),
   ]);
 

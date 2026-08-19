@@ -6,12 +6,12 @@ import { PublicPage } from "@/components/public-page";
 export const metadata: Metadata = {
   title: "Private AI workshops for teams",
   description: "Plan a practical Clearstep AI workshop around your team’s real work, questions, and goals.",
-  alternates: { canonical: "/private-workshops" },
+  alternates: { canonical: "/clearstep/private-workshops" },
 };
 
 export default function PrivateWorkshopsPage() {
   return (
-    <PublicPage>
+    <PublicPage brandKey="clearstep">
       <PageIntro eyebrow="For teams" title="A practical AI workshop shaped around your work.">
         <p className="m-0">Bring the team, the recurring tasks, and the questions. Clearstep turns them into a focused session with examples your people recognize and methods they can reuse.</p>
         <a className="button button-primary mt-8" href="#private-workshop-request">Tell us about your team</a>

@@ -3,7 +3,7 @@ import { withSupabase } from "npm:@supabase/server@1.4.1";
 import { requireUser } from "../_shared/auth.ts";
 import { rpc } from "../_shared/db.ts";
 import { ApiError, env, handleError, methodNotAllowed, ok, readJson, requireUuid } from "../_shared/http.ts";
-import { validateWorkshopPrice } from "../_shared/stripe.ts";
+import { validateCatalogPrice, validateWorkshopPrice } from "../_shared/stripe.ts";
 
 type AdminRequest = {
   action?: unknown;
@@ -15,6 +15,11 @@ const actions = new Set([
   "course_upsert",
   "course_price_update",
   "session_upsert",
+  "service_offerings_list",
+  "service_offering_upsert",
+  "service_offering_price_update",
+  "service_orders_list",
+  "service_order_fulfillment_update",
   "private_requests_list",
   "private_request_update",
   "private_request_quotes_page",
@@ -23,6 +28,7 @@ const actions = new Set([
   "dashboard_overview",
   "staff_list_page",
   "analytics_summary",
+  "service_analytics_summary",
   "enrollments_list",
   "google_connection_status",
   "staff_context",
@@ -51,6 +57,16 @@ type CoursePricingContext = {
   title: string;
   price_cents: number;
   currency: string;
+  stripe_product_id: string | null;
+  stripe_price_id: string | null;
+};
+
+type ServiceOfferingContext = {
+  catalog_item_id: string;
+  slug: string;
+  title: string;
+  price_cents: number;
+  currency: "EUR";
   stripe_product_id: string | null;
   stripe_price_id: string | null;
 };
@@ -170,6 +186,61 @@ function validateCourseContent(payload: Record<string, unknown>) {
   }
 }
 
+function validateServiceOfferingContent(payload: Record<string, unknown>) {
+  const requiredText: Array<[string, number]> = [
+    ["slug", 120],
+    ["title", 240],
+    ["summary", 1_000],
+    ["description", 10_000],
+    ["audience", 2_000],
+  ];
+  for (const [field, maximum] of requiredText) {
+    if (!boundedText(payload[field], maximum)) {
+      throw new ApiError("invalid_service_offering", `${field} is required and must be ${maximum} characters or fewer.`);
+    }
+  }
+  if (typeof payload.slug !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(payload.slug)) {
+    throw new ApiError("invalid_service_offering", "slug must use lower-case letters, numbers, and hyphens.");
+  }
+  if (
+    !Array.isArray(payload.outcomes)
+    || payload.outcomes.length > 20
+    || payload.outcomes.some((value) => !boundedText(value, 500))
+  ) {
+    throw new ApiError("invalid_service_offering", "Provide no more than 20 deliverables of 500 characters or fewer.");
+  }
+  const priceCents = Number(payload.price_cents);
+  const durationMinutes = payload.duration_minutes === null || payload.duration_minutes === undefined || payload.duration_minutes === ""
+    ? null
+    : Number(payload.duration_minutes);
+  if (!Number.isInteger(priceCents) || priceCents < 1) {
+    throw new ApiError("invalid_service_offering", "price_cents must be a positive whole number.");
+  }
+  if (durationMinutes !== null && (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 10_080)) {
+    throw new ApiError("invalid_service_offering", "duration_minutes must be a positive whole number no greater than one week.");
+  }
+  if (payload.status !== "draft" && payload.status !== "published" && payload.status !== "archived") {
+    throw new ApiError("invalid_service_offering", "Choose a valid package status.");
+  }
+  if (payload.visibility !== "public" && payload.visibility !== "private") {
+    throw new ApiError("invalid_service_offering", "Choose a valid package visibility.");
+  }
+  if (payload.currency !== undefined && String(payload.currency).toUpperCase() !== "EUR") {
+    throw new ApiError("invalid_service_offering", "Service packages must use EUR.");
+  }
+  if (payload.fulfillment_method !== undefined && payload.fulfillment_method !== "manual_scheduling") {
+    throw new ApiError("invalid_service_offering", "Service packages use manual scheduling.");
+  }
+  for (const [field, maximum] of [["seo_title", 240], ["seo_description", 1_000]] as const) {
+    if (payload[field] !== undefined && payload[field] !== null && payload[field] !== "" && !boundedText(payload[field], maximum)) {
+      throw new ApiError("invalid_service_offering", `${field} must be ${maximum} characters or fewer.`);
+    }
+  }
+  if (payload.catalog_item_id !== undefined && payload.catalog_item_id !== null && payload.catalog_item_id !== "") {
+    requireUuid(payload.catalog_item_id, "catalog_item_id");
+  }
+}
+
 export default {
   fetch: withSupabase({ auth: "user" }, async (req, ctx) => {
     if (req.method !== "POST") return methodNotAllowed();
@@ -183,6 +254,131 @@ export default {
         throw new ApiError("invalid_request", "payload must be an object.");
       }
       let payload = (body.payload ?? {}) as Record<string, unknown>;
+
+      if (body.action === "service_offerings_list") {
+        return ok(await rpc(ctx.supabaseAdmin, "list_service_offerings_for_staff", {
+          p_actor_user_id: user.id,
+        }));
+      }
+
+      if (body.action === "service_orders_list") {
+        const limit = payload.limit === undefined ? 100 : Number(payload.limit);
+        if (!Number.isInteger(limit) || limit < 1 || limit > 300) {
+          throw new ApiError("service_orders_limit_invalid", "limit must be a whole number between 1 and 300.");
+        }
+        return ok(await rpc(ctx.supabaseAdmin, "list_service_orders_for_staff", {
+          p_actor_user_id: user.id,
+          p_limit: limit,
+        }));
+      }
+
+      if (body.action === "service_order_fulfillment_update") {
+        const orderId = requireUuid(payload.order_id, "order_id");
+        const status = typeof payload.status === "string" ? payload.status : "";
+        if (!["new", "contacted", "scheduled", "in_progress", "delivered", "cancelled"].includes(status)) {
+          throw new ApiError("service_fulfillment_status_invalid", "Choose a valid service fulfilment status.");
+        }
+        return ok(await rpc(ctx.supabaseAdmin, "update_service_order_fulfillment", {
+          p_actor_user_id: user.id,
+          p_order_id: orderId,
+          p_status: status,
+        }));
+      }
+
+      if (body.action === "service_offering_price_update") {
+        const catalogItemId = requireUuid(payload.catalog_item_id, "catalog_item_id");
+        const priceCents = Number(payload.price_cents);
+        if (!Number.isInteger(priceCents) || priceCents < 1) {
+          throw new ApiError("service_price_invalid", "The package price must be a positive whole number of cents.");
+        }
+        const response = await rpc<{ services?: ServiceOfferingContext[] }>(ctx.supabaseAdmin, "list_service_offerings_for_staff", {
+          p_actor_user_id: user.id,
+        });
+        const service = response.services?.find((candidate) => candidate.catalog_item_id === catalogItemId);
+        if (!service) throw new ApiError("service_offering_not_found", "That service package was not found.", 404);
+        if (!service.stripe_product_id) {
+          throw new ApiError("service_stripe_product_required", "Connect a Stripe Product and Price before changing this package price.", 409);
+        }
+        if (service.price_cents === priceCents && service.stripe_price_id) {
+          return ok({ service, unchanged: true });
+        }
+
+        const stripeKey = env("STRIPE_API_KEY");
+        const stripe = new Stripe(stripeKey, { apiVersion: "2026-06-24.dahlia" });
+        let stripePrice: Stripe.Price;
+        try {
+          stripePrice = await stripe.prices.create({
+            active: true,
+            currency: "eur",
+            unit_amount: priceCents,
+            product: service.stripe_product_id,
+            tax_behavior: "inclusive",
+            nickname: `${service.slug} · staff price`,
+            metadata: {
+              bnc_service_line: "plate_and_post",
+              offering_id: service.catalog_item_id,
+              slug: service.slug,
+              environment: stripeKey.startsWith("sk_test_") ? "test" : "live",
+            },
+          }, {
+            idempotencyKey: `bnc-service-price:${service.catalog_item_id}:${service.stripe_price_id ?? "none"}:${priceCents}`,
+          });
+        } catch {
+          throw new ApiError("stripe_price_create_failed", "Stripe could not create the replacement Price. Check the restricted key's Price permissions.", 502);
+        }
+        await validateCatalogPrice(stripe, {
+          priceId: stripePrice.id,
+          productId: service.stripe_product_id,
+          amountCents: priceCents,
+          currency: "EUR",
+        }, "service package");
+        return ok(await rpc(ctx.supabaseAdmin, "update_service_offering_price", {
+          p_actor_user_id: user.id,
+          p_catalog_item_id: service.catalog_item_id,
+          p_price_cents: priceCents,
+          p_stripe_price_id: stripePrice.id,
+          p_expected_price_cents: service.price_cents,
+          p_expected_stripe_price_id: service.stripe_price_id,
+        }));
+      }
+
+      if (body.action === "service_offering_upsert") {
+        validateServiceOfferingContent(payload);
+        const role = await rpc<string | null>(ctx.supabaseAdmin, "get_staff_role", { p_user_id: user.id });
+        if (role !== "owner" && role !== "admin") {
+          throw new ApiError("staff_admin_required", "Administrator access is required.", 403);
+        }
+        const priceId = typeof payload.stripe_price_id === "string" ? payload.stripe_price_id.trim() : "";
+        const productId = typeof payload.stripe_product_id === "string" ? payload.stripe_product_id.trim() : "";
+        if (Boolean(priceId) !== Boolean(productId)) {
+          throw new ApiError("stripe_price_pair_required", "Stripe Product and Price IDs must be configured together.");
+        }
+        if (payload.status === "published" && (!priceId || !productId)) {
+          throw new ApiError("stripe_price_pair_required", "A published service package requires a verified Stripe Product and Price.");
+        }
+        const priceCents = Number(payload.price_cents);
+        if (priceId && productId) {
+          const stripe = new Stripe(env("STRIPE_API_KEY"), { apiVersion: "2026-06-24.dahlia" });
+          await validateCatalogPrice(stripe, {
+            priceId,
+            productId,
+            amountCents: priceCents,
+            currency: "EUR",
+          }, "service package");
+        }
+        payload = {
+          ...payload,
+          price_cents: priceCents,
+          currency: "EUR",
+          fulfillment_method: "manual_scheduling",
+          stripe_product_id: productId,
+          stripe_price_id: priceId,
+        };
+        return ok(await rpc(ctx.supabaseAdmin, "upsert_service_offering", {
+          p_actor_user_id: user.id,
+          p_payload: payload,
+        }));
+      }
 
       if (body.action === "course_price_update") {
         const courseId = requireUuid(payload.course_id, "course_id");
@@ -332,6 +528,14 @@ export default {
 
       if (body.action === "staff_list_page") {
         const page = staffPagePayload(payload);
+        if (page.resource === "customer_requests") {
+          return ok(await rpc(ctx.supabaseAdmin, "list_customer_requests_page", {
+            p_actor_user_id: user.id,
+            p_cursor_at: page.cursorAt,
+            p_cursor_id: page.cursorId,
+            p_limit: page.limit,
+          }));
+        }
         return ok(await rpc(ctx.supabaseAdmin, "list_staff_page", {
           p_actor_user_id: user.id,
           p_resource: page.resource,
@@ -355,6 +559,23 @@ export default {
       if (body.action === "dashboard_overview") {
         return ok(await rpc(ctx.supabaseAdmin, "dashboard_overview", {
           p_actor_user_id: user.id,
+        }));
+      }
+
+      if (body.action === "service_analytics_summary") {
+        const from = typeof payload.from === "string" && Number.isFinite(Date.parse(payload.from))
+          ? payload.from
+          : null;
+        const to = typeof payload.to === "string" && Number.isFinite(Date.parse(payload.to))
+          ? payload.to
+          : null;
+        if (!from || !to) {
+          throw new ApiError("invalid_service_analytics_range", "Choose a valid analytics date range.");
+        }
+        return ok(await rpc(ctx.supabaseAdmin, "service_analytics_summary", {
+          p_actor_user_id: user.id,
+          p_from: from,
+          p_to: to,
         }));
       }
 
