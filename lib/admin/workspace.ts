@@ -31,8 +31,8 @@ const roleRank: Record<StaffRole, number> = {
 
 export const adminSections: AdminSectionConfig[] = [
   { id: "overview", label: "Overview", short: "OV", minimumRole: "analyst" },
-  { id: "catalog", label: "Courses & sessions", short: "CS", minimumRole: "admin" },
-  { id: "bookings", label: "Bookings", short: "BK", minimumRole: "admin" },
+  { id: "catalog", label: "Service catalog", short: "SC", minimumRole: "admin" },
+  { id: "bookings", label: "Bookings & orders", short: "BO", minimumRole: "admin" },
   { id: "waitlist", label: "Waitlist", short: "WL", minimumRole: "admin" },
   { id: "private", label: "Private requests", short: "PR", minimumRole: "admin" },
   { id: "analytics", label: "Analytics", short: "AN", minimumRole: "analyst" },

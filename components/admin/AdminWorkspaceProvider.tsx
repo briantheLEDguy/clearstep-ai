@@ -2,7 +2,6 @@
 
 import type { MutableRefObject, ReactNode } from "react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -18,9 +17,11 @@ export type AdminResourceKey =
   | "overview"
   | "catalog"
   | "bookings"
+  | "orders"
   | "waitlist"
   | "private"
   | "analytics"
+  | "serviceAnalytics"
   | "requests"
   | "team"
   | "audit"
@@ -78,17 +79,17 @@ function AccessScreen({ state, onRetry }: { state: GateState; onRetry: () => voi
   const copy = state.kind === "checking"
     ? "Checking staff access…"
     : state.kind === "signed-out"
-      ? "Sign in with your Clearstep staff email to continue."
+      ? "Sign in with your BNC Consulting staff email to continue."
       : state.kind === "unconfigured"
         ? "The staff workspace is not connected in this environment."
         : state.kind === "unavailable"
           ? state.message
-          : "This account does not have access to the Clearstep staff workspace.";
+          : "This account does not have access to the BNC Consulting staff workspace.";
 
   return (
     <main className={styles.loadingScreen} aria-live="polite" aria-atomic="true">
       <section className={styles.accessCard}>
-        <Image src="/primary-logo.png" alt="Clearstep AI" width="200" height="53" priority />
+        <p className={styles.accessBrand}>BNC Consulting</p>
         <h1>Staff workspace</h1>
         <p>{copy}</p>
         {state.kind === "signed-out" || state.kind === "forbidden" ? (
@@ -127,7 +128,7 @@ export default function AdminWorkspaceProvider({ children }: { children: ReactNo
     cache.current.clear();
     setResourceVersions((current) => {
       const next = { ...current };
-      for (const key of ["overview", "catalog", "bookings", "waitlist", "private", "analytics", "requests", "team", "audit", "integrations", "automation", "operations"] as const) {
+      for (const key of ["overview", "catalog", "bookings", "orders", "waitlist", "private", "analytics", "serviceAnalytics", "requests", "team", "audit", "integrations", "automation", "operations"] as const) {
         next[key] = (current[key] ?? 0) + 1;
       }
       return next;

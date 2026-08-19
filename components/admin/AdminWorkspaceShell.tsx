@@ -1,7 +1,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-import Image from "next/image";
 import Link from "next/link";
 
 import { adminSectionHref, adminSections, canAccessAdminSection, type AdminSectionId } from "@/lib/admin/workspace";
@@ -17,8 +16,8 @@ export default function AdminWorkspaceShell({ section, children }: { section: Ad
     <div className={styles.adminShell}>
       <a className={styles.skipLink} href="#admin-main">Skip staff navigation</a>
       <aside className={styles.sidebar} aria-label="Staff workspace">
-        <Link className={styles.adminBrand} href="/" aria-label="Clearstep AI website">
-          <Image src="/primary-logo.png" alt="Clearstep AI" width="200" height="53" priority />
+        <Link className={styles.adminBrand} href="/" aria-label="BNC Consulting website">
+          <strong>BNC Consulting</strong>
           <span>Staff workspace</span>
         </Link>
         <nav className={styles.adminNav} aria-label="Staff workspace navigation">
@@ -36,7 +35,7 @@ export default function AdminWorkspaceShell({ section, children }: { section: Ad
         </nav>
         <div className={styles.sidebarFooter}>
           <span className={styles.livePill}>Live workspace</span>
-          <p>Customer, booking and analytics data comes from Clearstep&apos;s protected Supabase project.</p>
+          <p>Customer, workshop, service-order, and analytics data comes from the protected BNC platform.</p>
           <Link href="/">View public website <span aria-hidden="true">↗</span></Link>
         </div>
       </aside>
@@ -44,8 +43,8 @@ export default function AdminWorkspaceShell({ section, children }: { section: Ad
       <main className={styles.main} id="admin-main" tabIndex={-1}>
         <header className={styles.topbar}>
           <div>
-            <p className={styles.topbarContext}>Clearstep AI</p>
-            <h1 className={styles.topbarTitle}>Workshop operations</h1>
+            <p className={styles.topbarContext}>BNC Consulting</p>
+            <h1 className={styles.topbarTitle}>Service operations</h1>
           </div>
           <div className={styles.topbarActions}>
             <div className={styles.profile} aria-label={`Signed in as ${viewer.email}, ${role}`}>
@@ -70,7 +69,7 @@ export default function AdminWorkspaceShell({ section, children }: { section: Ad
           ) : null}
           {children}
           <footer className={styles.adminFooter}>
-            <span>Clearstep AI staff workspace</span>
+            <span>BNC Consulting staff workspace</span>
             <span>Europe/Amsterdam · Role-checked server actions</span>
           </footer>
         </div>

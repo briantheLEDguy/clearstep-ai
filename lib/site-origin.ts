@@ -1,4 +1,4 @@
-const fallbackOrigin = "https://www.clearstep-ai.nl";
+const fallbackOrigin = "https://www.bncconsulting.nl";
 
 export function getSiteOrigin() {
   const configuredOrigin = (process.env.NEXT_PUBLIC_SITE_URL ?? fallbackOrigin).replace(/\/$/u, "");

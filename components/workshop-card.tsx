@@ -16,7 +16,7 @@ export function WorkshopCard({ workshop, headingLevel = "h2" }: { workshop: Work
       </div>
       <div className="mt-6 flex items-center justify-between gap-4">
         <strong className="font-[var(--font-manrope)] text-lg">{workshop.priceLabel}</strong>
-        <Link className="card-link mt-0" href={`/workshops/${workshopRouteSegment(workshop)}`} aria-label={`View ${workshop.title} on ${workshop.dateLabel}`}>
+        <Link className="card-link mt-0" href={`/clearstep/workshops/${workshopRouteSegment(workshop)}`} aria-label={`View ${workshop.title} on ${workshop.dateLabel}`}>
           View workshop <span aria-hidden="true">→</span>
         </Link>
       </div>

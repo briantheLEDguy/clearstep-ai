@@ -3,6 +3,7 @@
 type CheckoutLegalAcceptanceProps = {
   checked: boolean;
   disabled?: boolean;
+  id?: string;
   onChange: (checked: boolean) => void;
   tone?: "dark" | "light";
 };
@@ -11,20 +12,21 @@ type CheckoutLegalAcceptanceProps = {
 export function CheckoutLegalAcceptance({
   checked,
   disabled = false,
+  id = "checkout-legal-acceptance",
   onChange,
   tone = "light",
 }: CheckoutLegalAcceptanceProps) {
   const colors = tone === "dark"
     ? "border-white/20 bg-white/8 text-white/85"
-    : "border-[var(--border)] bg-[var(--cream)] text-[var(--navy)]";
+    : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)]";
 
   return (
-    <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border p-4 text-left text-sm ${colors}`} htmlFor="checkout-legal-acceptance">
+    <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border p-4 text-left text-sm ${colors}`} htmlFor={id}>
       <input
-        className="mt-1 h-5 w-5 shrink-0 accent-[var(--action)]"
+        className="mt-1 h-5 w-5 shrink-0 accent-[var(--color-action)]"
         checked={checked}
         disabled={disabled}
-        id="checkout-legal-acceptance"
+        id={id}
         name="legalAccepted"
         onChange={(event) => onChange(event.target.checked)}
         type="checkbox"

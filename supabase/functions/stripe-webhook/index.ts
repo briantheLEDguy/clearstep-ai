@@ -64,6 +64,9 @@ export default {
           remediationReason: refundRemediationRequired ? refundRemediationReason : null,
           checkoutId: result.checkout_id ?? null,
           paymentId: result.payment_id ?? null,
+          serviceOrderId: result.service_order_id ?? null,
+          paymentStatus: result.payment_status ?? null,
+          fulfillmentStatus: result.fulfillment_status ?? null,
         },
       });
       return ok({ received: true, ...result });

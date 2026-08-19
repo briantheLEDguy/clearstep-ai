@@ -1,75 +1,58 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPage } from "@/components/public-page";
-import { WorkshopCard } from "@/components/workshop-card";
-import { getWorkshopCatalog } from "@/lib/workshops";
+import { COMPANY_DETAILS } from "@/shared/company-details";
 
 export const metadata: Metadata = {
-  title: { absolute: "Practical AI workshops for small businesses | Clearstep AI" },
-  description:
-    "Clearstep AI offers welcoming, hands-on workshops that turn everyday work into clear, repeatable AI workflows.",
+  title: { absolute: "BNC Consulting | Clearstep AI and Plate & Post" },
+  description: "Explore Clearstep AI workshops and Plate & Post product photography and social content services.",
   alternates: { canonical: "/" },
 };
 
-export default async function Home() {
-  const catalog = await getWorkshopCatalog();
-
+export default function BncConsultingHome() {
   return (
-    <PublicPage>
-      <section className="hero shell">
-        <div className="hero-copy">
-          <p className="eyebrow">Practical AI workshops</p>
-          <h1>Make AI useful.<br />Keep it simple.</h1>
-          <p className="hero-lede">
-            Clear, hands-on workshops for freelancers and small-business owners.
-            No jargon, no overwhelm—just guided practice you can use today.
-          </p>
-          <div className="hero-actions">
-            <Link className="button button-primary" href="/workshops">Find a workshop</Link>
-            <Link className="text-link" href="/private-workshops">Plan a private session <span aria-hidden="true">→</span></Link>
-          </div>
-          <ul className="trust-list" aria-label="Workshop benefits">
-            <li>No technical experience needed</li>
-            <li>Build a real workflow</li>
-            <li>Small groups, useful results</li>
-          </ul>
-        </div>
+    <PublicPage brandKey="bnc">
+      <section className="bnc-hero shell">
+        <p className="eyebrow">BNC Consulting</p>
+        <h1>One business.<br />Two focused service lines.</h1>
+        <p className="bnc-hero-lede">Practical AI education and food-first content services.</p>
+        <a className="button button-primary w-fit" href="#services">Explore our services</a>
+      </section>
 
-        <div className="hero-visual" aria-label="Three clear steps from an idea to a useful result">
-          <div className="step-card step-one"><span>1</span><strong>Start with your work</strong></div>
-          <div className="step-card step-two"><span>2</span><strong>Try a clear method</strong></div>
-          <div className="step-card step-three"><span>3</span><strong>Leave with a result</strong></div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="clear-path" src="/clear-path.png" alt="" width="200" height="136" />
+      <section className="shell pb-10 pt-6 md:pb-20" id="services" aria-labelledby="services-heading">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Services</p>
+            <h2 id="services-heading">Specialist help, under one roof.</h2>
+          </div>
+        </div>
+        <div className="service-line-grid">
+          <article className="service-line-card service-line-card-clearstep">
+            <p className="card-eyebrow">Practical AI workshops</p>
+            <h2>Clearstep AI</h2>
+            <p className="mt-5 text-lg text-[var(--color-text-muted)]">
+              Welcoming, hands-on workshops that turn everyday work into clear, repeatable AI workflows.
+            </p>
+            <Link className="button button-primary relative z-10" href="/clearstep">Explore Clearstep AI</Link>
+          </article>
+          <article className="service-line-card service-line-card-plate">
+            <p className="card-eyebrow">Photography + social content</p>
+            <h2>Plate &amp; Post</h2>
+            <p className="mt-5 text-lg text-[var(--color-text-muted)]">
+              Product photography and social content made for food-first brands that need every asset to work harder.
+            </p>
+            <Link className="button button-primary relative z-10" href="/plate-and-post">Explore Plate &amp; Post</Link>
+          </article>
         </div>
       </section>
 
-      <section className="workshop-preview">
-        <div className="shell">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Choose your next clear step</p>
-              <h2>Upcoming workshops</h2>
-            </div>
-            <Link className="text-link" href="/workshops">See all workshops <span aria-hidden="true">→</span></Link>
+      <section className="shell py-16 md:py-24" aria-labelledby="bnc-contact-heading">
+        <div className="grid gap-7 rounded-[30px] bg-white p-8 shadow-[var(--shadow-elevated)] md:grid-cols-[1fr_auto] md:items-center md:p-12">
+          <div>
+            <p className="eyebrow">Not sure where to start?</p>
+            <h2 id="bnc-contact-heading" className="max-w-3xl">Tell us what you need to move forward.</h2>
           </div>
-          {catalog.status === "ready" ? (
-            <div className="workshop-grid">
-              {catalog.workshops.slice(0, 2).map((workshop) => (
-                <WorkshopCard headingLevel="h3" key={workshop.sessionId} workshop={workshop} />
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state rounded-[24px] border border-[var(--border)] bg-white p-7 md:p-8" role="status">
-              <h3 className="text-2xl">
-                {catalog.status === "empty" ? "New workshop dates are on the way." : "Workshop dates are being updated."}
-              </h3>
-              <p className="mb-0 mt-3 max-w-2xl">
-                There are no public sessions to show right now. You can still plan a practical private workshop shaped around your team.
-              </p>
-              <Link className="text-link mt-5 inline-block" href="/private-workshops">Plan a private session <span aria-hidden="true">→</span></Link>
-            </div>
-          )}
+          <a className="button button-primary" href={`mailto:${COMPANY_DETAILS.email}`}>Contact BNC Consulting</a>
         </div>
       </section>
     </PublicPage>

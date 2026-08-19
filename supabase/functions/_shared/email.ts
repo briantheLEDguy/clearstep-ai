@@ -30,8 +30,11 @@ function formatDate(value: unknown): string {
   }).format(date);
 }
 
-function frame(title: string, body: string): string {
-  return `<!doctype html><html><body style="margin:0;background:#f4f7f5;color:#183029;font-family:Arial,sans-serif"><div style="max-width:640px;margin:0 auto;padding:32px 20px"><div style="background:#fff;border-radius:16px;padding:32px"><div style="font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#447566">Clearstep</div><h1 style="font-size:28px;line-height:1.2">${escapeHtml(title)}</h1>${body}<p style="margin-top:28px;color:#5b6d67">Clearstep · practical AI workshops</p></div></div></body></html>`;
+function frame(title: string, body: string, activeService = "Clearstep AI"): string {
+  const serviceLabel = activeService === "BNC Consulting"
+    ? "BNC Consulting"
+    : `${escapeHtml(activeService)} · a BNC Consulting service`;
+  return `<!doctype html><html><body style="margin:0;background:#f4f4f2;color:#252525;font-family:Arial,sans-serif"><div style="max-width:640px;margin:0 auto;padding:32px 20px"><div style="background:#fff;border-radius:16px;padding:32px"><div style="font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#555">BNC Consulting</div><h1 style="font-size:28px;line-height:1.2">${escapeHtml(title)}</h1>${body}<p style="margin-top:28px;color:#666">${serviceLabel}</p></div></div></body></html>`;
 }
 
 function linkButton(url: string, label: string): string {
@@ -134,10 +137,31 @@ export function operationalEmail(
       const text = `${payload.description}\n\nTotal: ${formatMoney(payload.amount_cents)} including VAT. Valid until ${payload.valid_until}.${paymentUrl ? `\n\nAccept and pay: ${paymentUrl}` : ""}`;
       return { to: target, subject, text, html: frame(subject, `<p>${escapeHtml(payload.description)}</p><p><strong>${escapeHtml(formatMoney(payload.amount_cents))}</strong> including VAT<br>Valid until ${escapeHtml(payload.valid_until)}</p>${paymentUrl ? linkButton(paymentUrl, "Accept and pay") : ""}`) };
     }
+    case "service_order_confirmation": {
+      const subject = `Your Plate & Post payment is confirmed: ${payload.service_title}`;
+      const accountUrl = `${siteUrl.replace(/\/$/u, "")}/account`;
+      const text = `We received your ${formatMoney(payload.amount_cents)} payment for ${payload.service_title}. Our team will contact you to agree scheduling. Payment does not reserve a particular date. View your order: ${accountUrl}`;
+      return {
+        to: target,
+        subject,
+        text,
+        html: frame(subject, `<p>We received your payment for <strong>${escapeHtml(payload.service_title)}</strong>.</p><p>Our team will contact you to agree scheduling. Payment does not reserve a particular date.</p>${linkButton(accountUrl, "View service order")}`, "Plate & Post"),
+      };
+    }
+    case "service_order_admin_alert": {
+      const subject = `New Plate & Post order: ${payload.service_title}`;
+      const text = `${payload.customer_email} paid ${formatMoney(payload.amount_cents)} for ${payload.service_title}. Order reference: ${payload.service_order_id}. Contact the customer to arrange scheduling.`;
+      return { to: target, subject, text, html: frame(subject, `<p>${escapeHtml(text)}</p>`, "Plate & Post") };
+    }
+    case "service_order_refund": {
+      const subject = `Your Plate & Post refund has been recorded: ${payload.service_title}`;
+      const text = `${formatMoney(payload.amount_refunded_cents)} has been refunded. Your bank may take several business days to show the credit.`;
+      return { to: target, subject, text, html: frame(subject, `<p>${escapeHtml(text)}</p>`, "Plate & Post") };
+    }
     case "staff_invite": {
-      const subject = "You have been invited to Clearstep";
-      const text = `You have been invited as ${payload.role}. Accept the invitation: ${payload.invite_url}`;
-      return { to: target, subject, text, html: frame(subject, `<p>You have been invited to the Clearstep team as <strong>${escapeHtml(payload.role)}</strong>.</p>${linkButton(String(payload.invite_url), "Accept invitation")}`) };
+      const subject = "You have been invited to BNC Consulting";
+      const text = `You have been invited to the BNC Consulting staff workspace as ${payload.role}. Accept the invitation: ${payload.invite_url}`;
+      return { to: target, subject, text, html: frame(subject, `<p>You have been invited to the BNC Consulting team as <strong>${escapeHtml(payload.role)}</strong>.</p>${linkButton(String(payload.invite_url), "Accept invitation")}`, "BNC Consulting") };
     }
     default:
       throw new ApiError("email_template_unknown", `Unknown email template: ${template}.`, 500);
@@ -181,12 +205,13 @@ function authActionLink(data: AuthHookPayload["email_data"], tokenHash: string, 
 export function authEmails(payload: AuthHookPayload): EmailMessage[] {
   const { user, email_data: data } = payload;
   const action = data.email_action_type;
+  const accountFrame = (title: string, body: string) => frame(title, body, "BNC Consulting");
   const labels: Record<string, [string, string]> = {
-    signup: ["Confirm your Clearstep account", "Confirm account"],
-    recovery: ["Reset your Clearstep password", "Reset password"],
-    magiclink: ["Your Clearstep sign-in link", "Sign in"],
-    invite: ["You have been invited to Clearstep", "Accept invitation"],
-    reauthentication: ["Confirm your Clearstep identity", "Confirm identity"],
+    signup: ["Confirm your BNC Consulting account", "Confirm account"],
+    recovery: ["Reset your BNC Consulting password", "Reset password"],
+    magiclink: ["Your BNC Consulting sign-in link", "Sign in"],
+    invite: ["You have been invited to BNC Consulting", "Accept invitation"],
+    reauthentication: ["Confirm your BNC Consulting identity", "Confirm identity"],
   };
 
   if (action === "reauthentication") {
@@ -195,9 +220,9 @@ export function authEmails(payload: AuthHookPayload): EmailMessage[] {
     }
     return [{
       to: user.email,
-      subject: "Your Clearstep verification code",
+      subject: "Your BNC Consulting verification code",
       text: `Your verification code is ${data.token}. It expires shortly.`,
-      html: frame(
+      html: accountFrame(
         "Your verification code",
         `<p>Use this code to confirm your identity:</p><p style="font-size:28px;font-weight:700;letter-spacing:.15em">${escapeHtml(data.token)}</p><p>It expires shortly.</p>`,
       ),
@@ -210,18 +235,18 @@ export function authEmails(payload: AuthHookPayload): EmailMessage[] {
       const link = authActionLink(data, data.token_hash_new, "email_change");
       messages.push({
         to: user.email,
-        subject: "Confirm your Clearstep email change",
+        subject: "Confirm your BNC Consulting email change",
         text: `Confirm the email change: ${link}`,
-        html: frame("Confirm your email change", linkButton(link, "Confirm email change")),
+        html: accountFrame("Confirm your email change", linkButton(link, "Confirm email change")),
       });
     }
     if (user.new_email && data.token_hash) {
       const link = authActionLink(data, data.token_hash, "email_change");
       messages.push({
         to: user.new_email,
-        subject: "Confirm your new Clearstep email",
+        subject: "Confirm your new BNC Consulting email",
         text: `Confirm your new email address: ${link}`,
-        html: frame("Confirm your new email", linkButton(link, "Confirm new email")),
+        html: accountFrame("Confirm your new email", linkButton(link, "Confirm new email")),
       });
     }
     if (messages.length) return messages;
@@ -232,12 +257,12 @@ export function authEmails(payload: AuthHookPayload): EmailMessage[] {
   if (!recipient || !tokenHash) {
     throw new ApiError("auth_email_invalid", "Auth hook payload has no recipient or token.", 400);
   }
-  const [subject, label] = labels[action] ?? ["Your Clearstep account link", "Continue"];
+  const [subject, label] = labels[action] ?? ["Your BNC Consulting account link", "Continue"];
   const link = authActionLink(data, tokenHash, action);
   return [{
     to: recipient,
     subject,
     text: `${subject}: ${link}`,
-    html: frame(subject, linkButton(link, label)),
+    html: accountFrame(subject, linkButton(link, label)),
   }];
 }

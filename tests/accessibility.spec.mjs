@@ -176,7 +176,16 @@ test("public pages reflow and have no automated accessibility violations at desk
     { width: 1440, height: 1000 },
     { width: 320, height: 900 },
   ]) {
-    for (const [path, heading] of [["/privacy/", "Privacy policy"], ["/complaints/", "Complaints procedure"]]) {
+    for (const [path, heading] of [
+      ["/", "One business. Two focused service lines."],
+      ["/clearstep/", "Make AI useful. Keep it simple."],
+      ["/plate-and-post/", "Content made to be craved."],
+      ["/plate-and-post/services/", "Choose the content package your brand needs."],
+      ["/plate-and-post/about/", "Product content with a food-first point of view."],
+      ["/plate-and-post/faq/", "Questions before you book Plate & Post."],
+      ["/privacy/", "Privacy policy"],
+      ["/complaints/", "Complaints procedure"],
+    ]) {
       await page.context().clearCookies();
       await page.setViewportSize(viewport);
       await page.goto(path);
@@ -203,7 +212,7 @@ test("the analyst admin workspace exposes only analyst navigation and has no Axe
   await expect(page.getByLabel("Signed in as analyst@clearstep.example, analyst")).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Overview", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Analytics", exact: true })).toBeVisible();
-  await expect(navigation.getByRole("link", { name: "Courses & sessions", exact: true })).toHaveCount(0);
+  await expect(navigation.getByRole("link", { name: "Service catalog", exact: true })).toHaveCount(0);
   await expect(navigation.getByRole("link", { name: "Team", exact: true })).toHaveCount(0);
   await expect(navigation.getByRole("link", { name: "Automation", exact: true })).toHaveCount(0);
   await expectNoAxeViolations(page);
@@ -214,9 +223,10 @@ test("the owner admin workspace exposes owner navigation and has no Axe violatio
   await page.goto("/admin/");
 
   const navigation = page.getByRole("navigation", { name: "Staff workspace navigation" });
-  await expect(page.getByRole("heading", { name: "Workshop operations", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Service operations", exact: true }).first()).toBeVisible();
   await expect(page.getByLabel("Signed in as owner@clearstep.example, owner")).toBeVisible();
-  await expect(navigation.getByRole("link", { name: "Courses & sessions", exact: true })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Service catalog", exact: true })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Bookings & orders", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Customer requests", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Team", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Audit log", exact: true })).toBeVisible();

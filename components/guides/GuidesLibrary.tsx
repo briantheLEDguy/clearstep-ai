@@ -369,7 +369,7 @@ export default function GuidesLibrary() {
   return (
     <main className={styles.library} data-format={active.format}>
       <aside className={styles.sidebar}>
-        <Link className={styles.brand} href="/">
+        <Link className={styles.brand} href="/clearstep">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/primary-logo.png" alt="Clearstep AI" width="200" height="53" />
         </Link>

@@ -4,7 +4,7 @@ import AdminWorkspaceProvider from "@/components/admin/AdminWorkspaceProvider";
 
 export const metadata: Metadata = {
   title: "Staff workspace",
-  description: "Clearstep AI workshop operations and reporting.",
+  description: "BNC Consulting workshop, service-order, and reporting operations.",
   robots: {
     index: false,
     follow: false,

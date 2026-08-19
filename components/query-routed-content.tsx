@@ -15,7 +15,7 @@ export function LegacyBookingRedirect() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session");
   const destination = sessionId?.startsWith("cs_")
-    ? `/checkout/success?session_id=${encodeURIComponent(sessionId)}`
+    ? `/checkout/success?session_id=${encodeURIComponent(sessionId)}&target=workshop`
     : "/account";
 
   useEffect(() => {

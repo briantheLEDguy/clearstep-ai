@@ -5,7 +5,7 @@ import { COMPANY_DETAILS } from "@/shared/company-details";
 
 export const metadata: Metadata = {
   title: "Privacy policy",
-  description: "How Clearstep collects, uses, stores, and protects personal information.",
+  description: "How BNC Consulting collects, uses, stores, and protects personal information across Clearstep AI and Plate & Post.",
   alternates: { canonical: "/privacy" },
 };
 
@@ -15,25 +15,25 @@ export default function PrivacyPage() {
       <CompanyContactDetails />
       <section>
         <h2>In plain language</h2>
-        <p>Clearstep collects only the information needed to run workshops, manage your account and booking, provide support, and improve the service. We do not sell personal information.</p>
+        <p>BNC Consulting collects only the information needed to run Clearstep AI workshops, provide Plate &amp; Post services, manage your account and purchases, provide support, and improve the service. We do not sell personal information.</p>
       </section>
       <section>
         <h2>Information we collect</h2>
         <ul>
           <li>Account details such as your name, email address, and sign-in provider.</li>
-          <li>Booking details, payment status, workshop attendance, waitlist status, and messages you send us.</li>
-          <li>Payment references from our payment provider. Clearstep does not store full card details.</li>
+          <li>Workshop bookings, service orders, payment and fulfilment status, attendance, waitlist status, scheduling details, and messages you send us.</li>
+          <li>Payment references from our payment provider. BNC Consulting does not store full card details.</li>
           <li>Optional anonymous website insight only after you choose to allow it: page views, course views, and a limited campaign source.</li>
           <li>Technical information needed for security, fraud prevention, and reliable operation.</li>
         </ul>
       </section>
       <section>
         <h2>How we use it</h2>
-        <p>We use information to create and secure accounts, process bookings, manage capacity and waitlists, send joining information, provide workshops, respond to questions, keep records, and meet legal obligations. Optional website insight is used only with your analytics consent and is not linked to your Clearstep account.</p>
+        <p>We use information to create and secure accounts, process bookings and service orders, manage capacity, waitlists and manual scheduling, provide the purchased service, respond to questions, keep records, and meet legal obligations. Optional website insight is used only with your analytics consent and is not linked to your BNC Consulting account.</p>
       </section>
       <section>
         <h2>Services that help us operate</h2>
-        <p>Clearstep uses specialist providers for website hosting, authentication and database services, payment processing, and Google Workspace email and calendar automation. They receive only the information needed to provide their part of the service and process it under their own security and privacy terms.</p>
+        <p>BNC Consulting uses specialist providers for website hosting, authentication and database services, payment processing, and Google Workspace email and calendar automation. They receive only the information needed to provide their part of the service and process it under their own security and privacy terms.</p>
       </section>
       <section>
         <h2>Retention and security</h2>

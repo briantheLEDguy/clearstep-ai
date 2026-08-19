@@ -6,7 +6,7 @@ import { COMPANY_DETAILS } from "@/shared/company-details";
 export const metadata: Metadata = {
   title: "Workshop FAQ",
   description: "Answers about Clearstep AI workshop experience, preparation, booking, payment, accessibility, and cancellations.",
-  alternates: { canonical: "/faq" },
+  alternates: { canonical: "/clearstep/faq" },
 };
 
 const questions = [
@@ -33,7 +33,7 @@ export default function FaqPage() {
   };
 
   return (
-    <PublicPage>
+    <PublicPage brandKey="clearstep">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       <PageIntro eyebrow="Questions, answered" title="Everything you need before taking the next step.">
         <p className="m-0">Can’t find your answer? Email <a className="font-bold text-[var(--action)] underline" href={`mailto:${COMPANY_DETAILS.email}`}>{COMPANY_DETAILS.email}</a>.</p>

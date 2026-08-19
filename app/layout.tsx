@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import "@fontsource-variable/dm-sans";
+import "@fontsource-variable/fraunces";
 import { serializeJsonLd } from "@/lib/json-ld";
 import { getSiteOrigin } from "@/lib/site-origin";
 import { COMPANY_DETAILS } from "@/shared/company-details";
@@ -24,34 +26,21 @@ export function generateMetadata(): Metadata {
   return {
     metadataBase: new URL(origin),
     title: {
-      default: "Clearstep AI — Make AI useful. Keep it simple.",
-      template: "%s | Clearstep AI",
+      default: "BNC Consulting — Clearstep AI and Plate & Post",
+      template: "%s | BNC Consulting",
     },
-    description:
-      "Practical AI workshops for freelancers and small businesses. Clear steps, real examples, no jargon.",
-    icons: {
-      icon: "/brand-mark.png",
-      shortcut: "/brand-mark.png",
-      apple: "/brand-mark.png",
-    },
+    description: "Focused business services from Clearstep AI and Plate & Post.",
     openGraph: {
       type: "website",
       locale: "en_GB",
-      siteName: "Clearstep AI",
-      title: "Clearstep AI — Make AI useful. Keep it simple.",
-      description: "Practical AI workshops for freelancers and small businesses.",
-      images: [{
-        url: "/og.png",
-        width: 1731,
-        height: 909,
-        alt: "Clearstep AI — Make AI useful. Keep it simple.",
-      }],
+      siteName: "BNC Consulting",
+      title: "BNC Consulting — Clearstep AI and Plate & Post",
+      description: "Focused business services from Clearstep AI and Plate & Post.",
     },
     twitter: {
-      card: "summary_large_image",
-      title: "Clearstep AI — Make AI useful. Keep it simple.",
-      description: "Practical AI workshops for freelancers and small businesses.",
-      images: ["/og.png"],
+      card: "summary",
+      title: "BNC Consulting — Clearstep AI and Plate & Post",
+      description: "Focused business services from Clearstep AI and Plate & Post.",
     },
   };
 }
@@ -61,13 +50,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   const organization = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    name: "Clearstep AI",
+    name: "BNC Consulting",
     legalName: COMPANY_DETAILS.name,
     url: origin,
-    logo: `${origin}/primary-logo.png`,
     email: COMPANY_DETAILS.email,
     telephone: COMPANY_DETAILS.phone,
-    description: "Practical AI workshops for freelancers and small businesses.",
+    description: "The home of Clearstep AI and Plate & Post.",
   };
 
   return (

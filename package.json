@@ -11,14 +11,16 @@
     "preview": "serve out -l 3000",
     "start": "npm run preview",
     "typecheck": "tsc --noEmit --incremental false",
-    "pretest": "npm run build",
+    "pretest": "node scripts/build-test.mjs",
     "test": "node --test tests/*.test.mjs supabase/tests/*.test.mjs",
     "pretest:a11y": "node scripts/build-a11y.mjs",
     "test:a11y": "playwright test",
     "test:db": "npx --yes supabase@2.81.3 test db --local supabase/tests/integration.pgtap.sql",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern playwright-report --ignore-pattern test-results"
   },
   "dependencies": {
+    "@fontsource-variable/dm-sans": "5.2.8",
+    "@fontsource-variable/fraunces": "5.2.8",
     "@supabase/supabase-js": "2.112.3",
     "next": "^16.3.1",
     "react": "19.2.6",

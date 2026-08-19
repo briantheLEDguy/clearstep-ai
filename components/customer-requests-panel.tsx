@@ -5,17 +5,19 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { functionErrorMessage, unwrapFunctionData } from "@/lib/supabase/functions";
 
 type EnrollmentOption = { id: string; label: string };
-type CustomerRequestKind = "access" | "correction" | "erasure" | "restriction" | "objection" | "cancellation";
+type ServiceOrderOption = { id: string; label: string };
+type CustomerRequestKind = "access" | "correction" | "erasure" | "restriction" | "objection" | "cancellation" | "change";
 type CustomerRequest = {
   id: string;
   kind: CustomerRequestKind;
   status: string;
   enrollment_id: string | null;
+  service_order_id: string | null;
   created_at: string;
   updated_at: string;
 };
 
-const dataRequestLabels: Record<Exclude<CustomerRequestKind, "cancellation">, string> = {
+const dataRequestLabels: Record<Exclude<CustomerRequestKind, "cancellation" | "change">, string> = {
   access: "Ask for access to my personal data",
   correction: "Ask us to correct my personal data",
   erasure: "Ask us to erase personal data",
@@ -23,8 +25,13 @@ const dataRequestLabels: Record<Exclude<CustomerRequestKind, "cancellation">, st
   objection: "Object to a use of my personal data",
 };
 
+const purchaseRequestLabels = {
+  change: "Ask to change a booking or service order",
+  cancellation: "Ask to cancel a booking or service order",
+} as const;
+
 function requestLabel(kind: CustomerRequestKind) {
-  return kind === "cancellation" ? "Cancellation or booking-change request" : dataRequestLabels[kind];
+  return kind === "cancellation" || kind === "change" ? purchaseRequestLabels[kind] : dataRequestLabels[kind];
 }
 
 function statusLabel(status: string) {
@@ -35,12 +42,22 @@ function statusLabel(status: string) {
  * A narrow authenticated intake centre. It deliberately records a request for
  * human review; it never promises an automated refund, export, or deletion.
  */
-export function CustomerRequestsPanel({ enrollments }: { enrollments: EnrollmentOption[] }) {
+export function CustomerRequestsPanel({
+  enrollments,
+  serviceOrders,
+}: {
+  enrollments: EnrollmentOption[];
+  serviceOrders: ServiceOrderOption[];
+}) {
   const [requests, setRequests] = useState<CustomerRequest[]>([]);
   const [kind, setKind] = useState<CustomerRequestKind>("access");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+  const purchaseTargets = [
+    ...enrollments.map((item) => ({ ...item, type: "enrollment" as const })),
+    ...serviceOrders.map((item) => ({ ...item, type: "serviceOrder" as const })),
+  ];
 
   const loadRequests = useCallback(async () => {
     const client = getSupabaseBrowserClient();
@@ -75,16 +92,23 @@ export function CustomerRequestsPanel({ enrollments }: { enrollments: Enrollment
     const form = event.currentTarget;
     const formData = new FormData(form);
     const details = String(formData.get("details") ?? "").trim();
-    const enrollmentId = String(formData.get("enrollmentId") ?? "");
-    if (kind === "cancellation" && !enrollmentId) {
-      setMessage("Choose the booking you want us to review.");
+    const purchaseTarget = String(formData.get("purchaseTarget") ?? "");
+    const isPurchaseRequest = kind === "cancellation" || kind === "change";
+    const [targetType, targetId] = purchaseTarget.split(":", 2);
+    if (isPurchaseRequest && (!targetId || (targetType !== "enrollment" && targetType !== "serviceOrder"))) {
+      setMessage("Choose the booking or service order you want us to review.");
       return;
     }
 
     setSubmitting(true);
     setMessage("");
-    const body = kind === "cancellation"
-      ? { action: "create_cancellation_request", enrollmentId, details }
+    const body = isPurchaseRequest
+      ? {
+          action: "create_purchase_request",
+          kind,
+          ...(targetType === "enrollment" ? { enrollmentId: targetId } : { serviceOrderId: targetId }),
+          details,
+        }
       : { action: "create_data_request", kind, details };
     const { error } = await client.functions.invoke("customer-requests", { body });
     if (error) {
@@ -99,45 +123,54 @@ export function CustomerRequestsPanel({ enrollments }: { enrollments: Enrollment
   }
 
   return (
-    <section className="mt-9 border-t border-[var(--border)] pt-8" aria-labelledby="privacy-requests-title">
+    <section className="mt-9 border-t border-[var(--color-border)] pt-8" aria-labelledby="privacy-requests-title">
       <p className="eyebrow">Privacy and booking support</p>
-      <h3 id="privacy-requests-title" className="text-2xl">Requests and cancellations</h3>
+      <h3 id="privacy-requests-title" className="text-2xl">Requests, changes, and cancellations</h3>
       <p className="text-sm text-[color:rgba(16,42,67,.72)]">Submit an authenticated request for staff review. A request does not automatically change a booking, payment, or data record.</p>
 
-      <form className="mt-5 grid gap-4 rounded-2xl bg-[var(--cream)] p-5" onSubmit={submit} aria-busy={submitting}>
+      <form className="mt-5 grid gap-4 rounded-2xl bg-[var(--color-surface)] p-5" onSubmit={submit} aria-busy={submitting}>
         <div>
           <label className="mb-2 block font-bold" htmlFor="customer-request-kind">What do you need?</label>
-          <select className="min-h-12 w-full rounded-xl border border-[var(--border)] bg-white px-3" id="customer-request-kind" value={kind} onChange={(event) => setKind(event.target.value as CustomerRequestKind)}>
+          <select className="min-h-12 w-full rounded-xl border border-[var(--color-border)] bg-white px-3" id="customer-request-kind" value={kind} onChange={(event) => setKind(event.target.value as CustomerRequestKind)}>
             {Object.entries(dataRequestLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            <option value="cancellation">Cancellation or booking-change request</option>
+            <option value="change">{purchaseRequestLabels.change}</option>
+            <option value="cancellation">{purchaseRequestLabels.cancellation}</option>
           </select>
         </div>
-        {kind === "cancellation" ? (
+        {kind === "cancellation" || kind === "change" ? (
           <div>
-            <label className="mb-2 block font-bold" htmlFor="customer-request-enrollment">Booking to review</label>
-            <select className="min-h-12 w-full rounded-xl border border-[var(--border)] bg-white px-3" id="customer-request-enrollment" name="enrollmentId" required>
-              <option value="">Choose a booking</option>
-              {enrollments.map((enrollment) => <option key={enrollment.id} value={enrollment.id}>{enrollment.label}</option>)}
+            <label className="mb-2 block font-bold" htmlFor="customer-request-purchase">Booking or service order to review</label>
+            <select className="min-h-12 w-full rounded-xl border border-[var(--color-border)] bg-white px-3" id="customer-request-purchase" name="purchaseTarget" required>
+              <option value="">Choose a purchase</option>
+              {purchaseTargets.map((target) => (
+                <option key={`${target.type}:${target.id}`} value={`${target.type}:${target.id}`}>
+                  {target.type === "enrollment" ? "Workshop" : "Plate & Post"} · {target.label}
+                </option>
+              ))}
             </select>
           </div>
         ) : null}
         <div>
           <label className="mb-2 block font-bold" htmlFor="customer-request-details">Helpful context <span className="font-normal">(optional)</span></label>
-          <textarea className="w-full rounded-xl border border-[var(--border)] bg-white p-3" id="customer-request-details" name="details" rows={3} maxLength={1000} />
+          <textarea className="w-full rounded-xl border border-[var(--color-border)] bg-white p-3" id="customer-request-details" name="details" rows={3} maxLength={1000} />
           <p className="mb-0 mt-1 text-xs text-[color:rgba(16,42,67,.68)]">Do not include passwords, payment card details, health information, or other sensitive data.</p>
         </div>
-        <button className="button button-primary justify-self-start border-0 disabled:opacity-60" type="submit" disabled={submitting || (kind === "cancellation" && !enrollments.length)}>{submitting ? "Submitting…" : "Submit for review"}</button>
+        <button className="button button-primary justify-self-start border-0 disabled:opacity-60" type="submit" disabled={submitting || ((kind === "cancellation" || kind === "change") && !purchaseTargets.length)}>{submitting ? "Submitting…" : "Submit for review"}</button>
       </form>
 
-      {message ? <p className="mt-4 rounded-xl bg-[var(--mint)] p-3 text-sm" role="status" aria-live="polite">{message}</p> : null}
+      {message ? <p className="mt-4 rounded-xl bg-[var(--color-surface-soft)] p-3 text-sm" role="status" aria-live="polite">{message}</p> : null}
       <div className="mt-6" aria-live="polite">
         <h4 className="text-lg">Your submitted requests</h4>
         {loading ? <p>Loading requests…</p> : requests.length ? (
           <ul className="grid gap-2 p-0" aria-label="Submitted requests">
             {requests.map((request) => (
-              <li className="list-none rounded-xl border border-[var(--border)] p-3" key={request.id}>
+              <li className="list-none rounded-xl border border-[var(--color-border)] p-3" key={request.id}>
                 <strong>{requestLabel(request.kind)}</strong><br />
-                <span className="text-sm">Status: {statusLabel(request.status)} · Submitted {new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(request.created_at))}</span>
+                <span className="text-sm">
+                  Status: {statusLabel(request.status)}
+                  {request.service_order_id ? " · Plate & Post service order" : request.enrollment_id ? " · Workshop booking" : ""}
+                  {` · Submitted ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(request.created_at))}`}
+                </span>
               </li>
             ))}
           </ul>
