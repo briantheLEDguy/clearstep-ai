@@ -5,12 +5,13 @@ import test from "node:test";
 const source = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
 test("the Pages build reads the sanitized Supabase workshop catalog", async () => {
-  const [catalog, home, listing, detail, sitemap] = await Promise.all([
+  const [catalog, home, listing, detail, sitemap, a11yBuild] = await Promise.all([
     source("../lib/workshops.ts"),
     source("../app/page.tsx"),
     source("../app/workshops/page.tsx"),
     source("../app/workshops/[slug]/page.tsx"),
     source("../app/sitemap.ts"),
+    source("../scripts/build-a11y.mjs"),
   ]);
 
   assert.match(catalog, /\/rest\/v1\/rpc\/public_workshop_catalog/u);
@@ -25,6 +26,8 @@ test("the Pages build reads the sanitized Supabase workshop catalog", async () =
     assert.match(page, /getWorkshop(?:Catalog)?\(/u);
   }
   assert.match(detail, /getWorkshopByRouteSegment\(/u);
+  assert.match(detail, /CLEARSTEP_A11Y_CATALOG_FIXTURE/u);
+  assert.match(a11yBuild, /CLEARSTEP_A11Y_CATALOG_FIXTURE:\s*"true"/u);
 });
 
 test("catalog mapping validates booking, price, schedule, and capacity fields", async () => {
