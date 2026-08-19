@@ -19,6 +19,8 @@ GitHub Pages / Next.js static export
 
 Supabase is authoritative for catalogue availability, identity, capacity, holds, enrollments, payments, waitlists, staff roles, automation state, and analytics. GitHub Actions loads the sanitized `public_workshop_catalog()` RPC while producing the static Pages artifact; an hourly scheduled workflow refreshes published workshop pages. Each published session receives an immutable `/workshops/[course-slug]--[session-id]` URL. Money is integer EUR cents; database times are UTC `timestamptz` and display primarily in `Europe/Amsterdam`.
 
+The protected Guides library keeps article content and editorial-format metadata in `lib/guides.ts`. `components/guides/GuidesLibrary.tsx` renders nine subject-specific reading modes—including labs, audits, timelines, canvases, and runbooks—through one accessible library shell. The project-local `.codex/skills/technical-guide-writer` skill defines the writing and safety standard for future guide work.
+
 ## Routes
 
 Indexable public routes:
@@ -33,6 +35,7 @@ Identity and noindex routes:
 
 - `/sign-in`, `/auth/callback`
 - `/account`, `/account/bookings`, `/account/waitlist`, `/account/private-quote`
+- `/guides` (confirmed customers and staff)
 - `/checkout/success`, `/checkout/cancel`
 - `/staff/invite`
 - `/admin`
