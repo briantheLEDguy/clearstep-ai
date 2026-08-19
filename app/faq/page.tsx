@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PageIntro } from "@/components/page-intro";
 import { PublicPage } from "@/components/public-page";
+import { COMPANY_DETAILS } from "@/shared/company-details";
 
 export const metadata: Metadata = {
   title: "Workshop FAQ",
@@ -13,11 +14,11 @@ const questions = [
   ["What should I bring?", "Bring a laptop, access to an AI tool you are comfortable using, and one real task or example from your work. We will tell you about any session-specific preparation by email."],
   ["Are the workshops recorded?", "Public live workshops are designed for active participation and are not recorded by default. If a specific online session will be recorded, that will be stated clearly before booking."],
   ["How large are the groups?", "Public sessions are kept small—normally 10 to 14 people—so there is time to practice and ask questions."],
-  ["What happens after I pay?", "You receive an enrollment confirmation and calendar details at the email address on your Clearstep account. Your booking also appears in your account."],
+  ["When is my place confirmed?", "Your place is confirmed only after payment succeeds and Clearstep records your enrollment. We then send confirmation and joining or calendar details to the email address on your Clearstep account; the booking also appears in your account."],
   ["What if the workshop is full?", "Join the waitlist. When a place opens, the first eligible person receives a time-limited booking offer before we move to the next person."],
-  ["Can I transfer my place?", "Usually, yes. Contact us before the workshop with the new participant’s details. See the cancellation policy for timing and refund information."],
+  ["Can I transfer my place?", "You may usually transfer a public-workshop place to another person at no charge. Contact us before the workshop with the new participant’s name and email address. See the cancellation policy for timing and refund information."],
   ["Can you run this for my team?", "Yes. Private workshops can use your team’s examples, goals, and preferred format. Visit the private workshops page to start a conversation."],
-  ["What about accessibility or dietary needs?", "Tell us as early as possible. We will confirm the venue or online accommodations we can provide and work with you on practical needs."],
+  ["What about accessibility or dietary needs?", "Contact us as early as possible—ideally before booking—with the practical adjustment you need. We will discuss venue access, online participation, or dietary arrangements and confirm what we can provide before you pay. Please share only the information needed to make the arrangement."],
 ];
 
 export default function FaqPage() {
@@ -35,7 +36,7 @@ export default function FaqPage() {
     <PublicPage>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       <PageIntro eyebrow="Questions, answered" title="Everything you need before taking the next step.">
-        <p className="m-0">Can’t find your answer? Email <a className="font-bold text-[var(--action)] underline" href="mailto:brian@bncconsulting.co">brian@bncconsulting.co</a>.</p>
+        <p className="m-0">Can’t find your answer? Email <a className="font-bold text-[var(--action)] underline" href={`mailto:${COMPANY_DETAILS.email}`}>{COMPANY_DETAILS.email}</a>.</p>
       </PageIntro>
       <section className="shell max-w-4xl pb-8">
         <div className="grid gap-4">

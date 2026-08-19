@@ -4,6 +4,7 @@ import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { CustomerRequestsPanel } from "@/components/customer-requests-panel";
 
 type Enrollment = {
   id: string;
@@ -164,6 +165,12 @@ export function AccountDashboard() {
             <Link className="text-link mt-4 inline-block" href="/workshops">Explore workshops →</Link>
           </div>
         )}
+        <CustomerRequestsPanel
+          enrollments={enrollments.map((enrollment) => ({
+            id: enrollment.id,
+            label: enrollment.course?.title ?? `Workshop ${enrollment.id.slice(0, 8).toUpperCase()}`,
+          }))}
+        />
       </section>
       <aside className="rounded-[28px] bg-[var(--navy)] p-7 text-[var(--cream)]" aria-label="Account details">
         <p className="eyebrow text-[var(--mint)]!">Account</p>

@@ -39,7 +39,7 @@ test("submits bot signals and request details through the private workshop Edge 
   assert.match(source, /unwrapFunctionData<RequestResult>\(data\)/);
   assert.match(source, /typeof result\.request_id !== "string"/);
   assert.match(source, /getSupabaseBrowserClient\(\)/);
-  assert.match(source, /mailto:brian@bncconsulting\.co/);
+  assert.match(source, /COMPANY_DETAILS\.email/);
 });
 
 test("routes the page’s primary call to action to the request form", async () => {

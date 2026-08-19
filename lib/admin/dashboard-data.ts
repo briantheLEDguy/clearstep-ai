@@ -93,17 +93,17 @@ export type PrivateRequestRecord = {
   id: string;
   contact_name: string;
   email: string;
-  phone: string | null;
   organization: string;
   attendee_count: number | null;
   preferred_format: string | null;
   preferred_timing: string | null;
   goals: string;
-  notes: string | null;
   status: string;
   created_at: string;
   updated_at: string;
   quotes: QuoteRecord[];
+  quote_count?: number;
+  quotes_truncated?: boolean;
 };
 
 export type AnalyticsSummary = {
@@ -164,7 +164,6 @@ export type AuditRecord = {
   action: string;
   target_type: string;
   target_id: string | null;
-  metadata: Record<string, unknown>;
   occurred_at: string;
 };
 

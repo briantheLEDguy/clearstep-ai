@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { trackEvent } from "@/lib/analytics";
+import { CheckoutLegalAcceptance } from "@/components/checkout-legal-acceptance";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { functionErrorMessage, unwrapFunctionData } from "@/lib/supabase/functions";
+import { COMPANY_DETAILS } from "@/shared/company-details";
 
 type WorkshopSession = {
   id: string;
@@ -28,7 +29,7 @@ function initialState(sessionRef?: string, offerToken?: string): OfferState {
 function initialMessage(sessionRef?: string, offerToken?: string) {
   if (!sessionRef || !offerToken) return "This waitlist offer link is invalid or incomplete.";
   if (!isSupabaseConfigured()) {
-    return "Online booking is being connected. Please contact Brian for help with this offer.";
+    return "Online booking is being connected. Please contact us for help with this offer.";
   }
   return "Checking your offer…";
 }
@@ -45,6 +46,7 @@ export function WaitlistOffer({
   const [state, setState] = useState<OfferState>(() => initialState(sessionRef, offerToken));
   const [message, setMessage] = useState(() => initialMessage(sessionRef, offerToken));
   const [session, setSession] = useState<WorkshopSession | null>(null);
+  const [legalAccepted, setLegalAccepted] = useState(false);
 
   useEffect(() => {
     if (!sessionRef || !offerToken) return;
@@ -89,6 +91,11 @@ export function WaitlistOffer({
 
   async function acceptOffer() {
     if (!session || !offerToken) return;
+    if (!legalAccepted) {
+      setState("error");
+      setMessage("Please read and accept the Terms and Cancellation policy before opening checkout.");
+      return;
+    }
     const course = firstRelated(session.courses);
     if (!course) {
       setState("invalid");
@@ -101,15 +108,13 @@ export function WaitlistOffer({
 
     setState("loading");
     setMessage("Opening secure checkout…");
-    void trackEvent("waitlist_offer_checkout_started", {
-      workshop_slug: course.slug,
-    });
 
     const { data, error } = await client.functions.invoke("create-checkout", {
       body: {
         workshopSlug: course.slug,
         sessionRef: session.id,
         offerToken,
+        legalAccepted: true,
       },
     });
 
@@ -160,17 +165,20 @@ export function WaitlistOffer({
         <Link className="button button-primary mt-6 w-full text-center" href={signInHref}>Sign in to continue</Link>
       ) : null}
       {state === "ready" || state === "loading" ? (
-        <button
-          className="button button-primary mt-6 w-full cursor-pointer border-0 disabled:cursor-wait disabled:opacity-65"
-          type="button"
-          disabled={state === "loading"}
-          onClick={acceptOffer}
-        >
-          {state === "loading" ? "Opening checkout…" : "Book my place"}
-        </button>
+        <>
+          <CheckoutLegalAcceptance checked={legalAccepted} onChange={setLegalAccepted} />
+          <button
+            className="button button-primary mt-6 w-full cursor-pointer border-0 disabled:cursor-wait disabled:opacity-65"
+            type="button"
+            disabled={state === "loading" || !legalAccepted}
+            onClick={acceptOffer}
+          >
+            {state === "loading" ? "Opening checkout…" : "Book my place"}
+          </button>
+        </>
       ) : null}
       <p className="mb-0 mt-5 text-sm text-[color:rgba(16,42,67,.68)]">
-        This link is personal to your waitlist entry. If it does not work, email <a className="font-bold underline" href="mailto:brian@bncconsulting.co">brian@bncconsulting.co</a>.
+        This link is personal to your waitlist entry. If it does not work, email <a className="font-bold underline" href={`mailto:${COMPANY_DETAILS.email}`}>{COMPANY_DETAILS.email}</a>.
       </p>
     </div>
   );

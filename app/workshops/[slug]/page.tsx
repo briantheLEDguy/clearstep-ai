@@ -13,7 +13,11 @@ type WorkshopPageProps = {
 
 export async function generateStaticParams() {
   const catalog = await getWorkshopCatalog();
-  if (catalog.status === "unavailable" && process.env.CI === "true") {
+  // The browser accessibility fixture intentionally points Supabase at its
+  // intercepted local endpoint. Every normal CI/production export remains
+  // fail-closed when the real catalogue cannot be loaded.
+  const isA11yFixture = process.env.CLEARSTEP_A11Y_CATALOG_FIXTURE === "true";
+  if (catalog.status === "unavailable" && process.env.CI === "true" && !isA11yFixture) {
     throw new Error("Workshop catalog is unavailable; refusing to publish stale workshop routes.");
   }
 

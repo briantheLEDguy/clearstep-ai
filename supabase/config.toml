@@ -45,3 +45,6 @@ verify_jwt = false
 
 [functions.auth-send-email-hook]
 verify_jwt = false
+
+[functions.customer-requests]
+verify_jwt = true

@@ -1,5 +1,6 @@
 import Stripe from "npm:stripe@22.3.2";
 import { withSupabase } from "npm:@supabase/server@1.4.1";
+import { CHECKOUT_LEGAL_DOCUMENT_KEYS, LEGAL_DOCUMENTS } from "../../../shared/legal-documents.ts";
 import { requireUser } from "../_shared/auth.ts";
 import { resolveWorkshopSession } from "../_shared/catalog.ts";
 import { sha256Hex } from "../_shared/crypto.ts";
@@ -12,6 +13,7 @@ type CheckoutRequest = {
   sessionRef?: unknown;
   offerToken?: unknown;
   quoteToken?: unknown;
+  legalAccepted?: unknown;
 };
 
 type PrivateQuote = {
@@ -62,6 +64,13 @@ export default {
     try {
       const user = requireUser(ctx.userClaims);
       const body = await readJson<CheckoutRequest>(req);
+      if (body.legalAccepted !== true) {
+        throw new ApiError(
+          "legal_acknowledgement_required",
+          "Please accept the Terms of service and Cancellation policy before continuing to checkout.",
+          422,
+        );
+      }
       let sessionId: string;
       let workshopSlug: string;
       let quoteToken: string | null = null;
@@ -115,6 +124,15 @@ export default {
             p_email: user.email,
             p_offer_token_hash: offerTokenHash,
           });
+
+        await rpc(ctx.supabaseAdmin, "record_checkout_legal_acceptance", {
+          p_checkout_id: hold.checkout_id,
+          p_user_id: user.id,
+          p_documents: CHECKOUT_LEGAL_DOCUMENT_KEYS.map((key) => ({
+            document_key: LEGAL_DOCUMENTS[key].key,
+            document_version: LEGAL_DOCUMENTS[key].version,
+          })),
+        });
 
         await validateWorkshopPrice(stripe, {
           priceId: hold.stripe_price_id,

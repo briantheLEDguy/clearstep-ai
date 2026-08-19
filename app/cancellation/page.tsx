@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
+import { COMPANY_DETAILS } from "@/shared/company-details";
 
 export const metadata: Metadata = {
   title: "Cancellation policy",
@@ -9,18 +10,18 @@ export const metadata: Metadata = {
 
 export default function CancellationPage() {
   return (
-    <LegalPage eyebrow="Changes of plan" title="Cancellation policy">
+    <LegalPage eyebrow="Changes of plan" document="cancellation">
       <section>
-        <h2>Cancel at least 7 days before</h2>
-        <p>Contact us at least seven calendar days before the workshop starts for a refund to the original payment method. Payment-provider processing time may affect when the refund appears.</p>
+        <h2>Ask us to review a change</h2>
+        <p>Use the authenticated request centre in your account to ask for a cancellation, transfer, credit, or refund review. We will record the date of your request and review the booking, the applicable terms, and any statutory rights before confirming an outcome.</p>
       </section>
       <section>
-        <h2>Cancel within 7 days</h2>
-        <p>Because places are limited and preparation has begun, late cancellations are normally offered a transfer to another person or a credit toward a future public workshop rather than a cash refund. Contact us as soon as possible so we can help.</p>
+        <h2>What happens after you ask</h2>
+        <p>A staff member reviews each request manually. A request does not automatically cancel a booking or create a refund. Where a refund is approved, it is returned through the original payment method and provider timing may affect when it appears.</p>
       </section>
       <section>
         <h2>Transfer your place</h2>
-        <p>You may usually transfer a public-workshop place to another person at no charge. Send their name and email address before the session so we can update enrollment and joining information.</p>
+        <p>You can ask for a transfer to another person through the authenticated request centre. We will review the booking and the applicable policy before confirming whether a transfer can be made.</p>
       </section>
       <section>
         <h2>If Clearstep cancels</h2>
@@ -28,7 +29,11 @@ export default function CancellationPage() {
       </section>
       <section>
         <h2>How to request a change</h2>
-        <p>Email <a href="mailto:brian@bncconsulting.co">brian@bncconsulting.co</a> from the address used for booking. Include the workshop, attendee name, and whether you are requesting cancellation, transfer, or credit.</p>
+        <p><a href="/account">Sign in to your account</a> and submit a cancellation or booking-change request for the relevant workshop. If you cannot access your account, email <a href={`mailto:${COMPANY_DETAILS.email}`}>{COMPANY_DETAILS.email}</a> from the address used for booking.</p>
+      </section>
+      <section>
+        <h2>Complaints</h2>
+        <p>If you are unhappy with how we handled a request, follow our <a href="/complaints">complaints procedure</a>.</p>
       </section>
     </LegalPage>
   );

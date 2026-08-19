@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { CompanyContactDetails } from "@/components/company-contact-details";
 import { LegalPage } from "@/components/legal-page";
+import { COMPANY_DETAILS } from "@/shared/company-details";
 
 export const metadata: Metadata = {
   title: "Terms of service",
@@ -9,10 +11,11 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <LegalPage eyebrow="Using Clearstep" title="Terms of service">
+    <LegalPage eyebrow="Using Clearstep" document="terms">
+      <CompanyContactDetails />
       <section>
         <h2>Agreement</h2>
-        <p>By using this website, creating an account, or booking a workshop, you agree to these terms and the policies linked from them. If you book for someone else, you confirm that you are authorised to provide their details and accept the booking terms.</p>
+        <p>Before starting payment for a workshop, you must actively acknowledge the current Terms of service and Cancellation policy. We record that acknowledgement with the checkout attempt. If you book for someone else, you confirm that you are authorised to provide their details and accept the booking terms.</p>
       </section>
       <section>
         <h2>Accounts</h2>
@@ -40,7 +43,7 @@ export default function TermsPage() {
       </section>
       <section>
         <h2>Contact</h2>
-        <p>Questions about these terms can be sent to <a href="mailto:brian@bncconsulting.co">brian@bncconsulting.co</a>.</p>
+        <p>Questions about these terms can be sent to <a href={`mailto:${COMPANY_DETAILS.email}`}>{COMPANY_DETAILS.email}</a>. For a service complaint, follow our <a href="/complaints">complaints procedure</a>.</p>
       </section>
     </LegalPage>
   );

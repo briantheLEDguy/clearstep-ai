@@ -14,7 +14,7 @@ export default function PrivateWorkshopsPage() {
     <PublicPage>
       <PageIntro eyebrow="For teams" title="A practical AI workshop shaped around your work.">
         <p className="m-0">Bring the team, the recurring tasks, and the questions. Clearstep turns them into a focused session with examples your people recognize and methods they can reuse.</p>
-        <a className="button button-primary mt-8" href="#private-workshop-request" data-analytics-event="cta_private_request">Tell us about your team</a>
+        <a className="button button-primary mt-8" href="#private-workshop-request">Tell us about your team</a>
       </PageIntro>
       <section className="bg-[var(--navy)] py-16 text-[var(--cream)] md:py-24">
         <div className="shell">

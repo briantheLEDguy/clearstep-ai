@@ -52,8 +52,8 @@ export default {
         attendee_count: attendeeCount,
         preferred_format: asText(body.preferredFormat, "preferredFormat", { max: 20, optional: true }),
         preferred_timing: asText(body.preferredTiming, "preferredTiming", { max: 500, optional: true }),
-        goals: asText(body.goals, "goals", { min: 10, max: 5_000 }),
-        notes: asText(body.notes, "notes", { max: 5_000, optional: true }),
+        goals: asText(body.goals, "goals", { min: 10, max: 2_000 }),
+        notes: asText(body.notes, "notes", { max: 1_000, optional: true }),
         consent_to_contact: body.consentToContact === true,
       };
       const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";

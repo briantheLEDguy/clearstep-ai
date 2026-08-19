@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { trackEvent } from "@/lib/analytics";
+import { CheckoutLegalAcceptance } from "@/components/checkout-legal-acceptance";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { functionErrorMessage, unwrapFunctionData } from "@/lib/supabase/functions";
+import { COMPANY_DETAILS } from "@/shared/company-details";
 
 type QuoteState = "checking" | "ready" | "signed-out" | "loading" | "invalid" | "error";
 
@@ -37,25 +38,29 @@ export function PrivateQuoteCheckout({ quoteToken }: { quoteToken?: string }) {
         return;
       }
       setState("ready");
-      setMessage("Your identity is confirmed. Stripe will show the approved quote total before you pay.");
+      setMessage("You’re signed in. We’ll confirm this personal quote securely when you continue.");
     });
 
     return () => {
       active = false;
     };
   }, [tokenValid]);
+  const [legalAccepted, setLegalAccepted] = useState(false);
 
   async function openCheckout() {
     if (!tokenValid) return;
+    if (!legalAccepted) {
+      setState("error");
+      setMessage("Please read and accept the Terms and Cancellation policy before opening checkout.");
+      return;
+    }
     const client = getSupabaseBrowserClient();
     if (!client) return;
 
     setState("loading");
     setMessage("Opening secure checkout…");
-    void trackEvent("private_quote_checkout_started");
-
     const { data, error } = await client.functions.invoke("create-checkout", {
-      body: { quoteToken },
+      body: { quoteToken, legalAccepted: true },
     });
 
     if (error) {
@@ -89,17 +94,20 @@ export function PrivateQuoteCheckout({ quoteToken }: { quoteToken?: string }) {
         <Link className="button button-primary mt-6 w-full text-center" href={`/sign-in?next=${encodeURIComponent(returnPath)}`}>Sign in to continue</Link>
       ) : null}
       {state === "ready" || state === "loading" ? (
-        <button
-          className="button button-primary mt-6 w-full cursor-pointer border-0 disabled:cursor-wait disabled:opacity-65"
-          type="button"
-          disabled={state === "loading"}
-          onClick={openCheckout}
-        >
-          {state === "loading" ? "Opening checkout…" : "Review quote and pay"}
-        </button>
+        <>
+          <CheckoutLegalAcceptance checked={legalAccepted} onChange={setLegalAccepted} />
+          <button
+            className="button button-primary mt-6 w-full cursor-pointer border-0 disabled:cursor-wait disabled:opacity-65"
+            type="button"
+            disabled={state === "loading" || !legalAccepted}
+            onClick={openCheckout}
+          >
+            {state === "loading" ? "Opening checkout…" : "Review quote and pay"}
+          </button>
+        </>
       ) : null}
       <p className="mb-0 mt-5 text-sm text-[color:rgba(16,42,67,.68)]">
-        The link is personal, single-purpose, and tied to the quoted email address. Questions? <a className="font-bold underline" href="mailto:brian@bncconsulting.co">Email Brian</a>.
+        The link is personal, single-purpose, and tied to the quoted email address. Questions? <a className="font-bold underline" href={`mailto:${COMPANY_DETAILS.email}`}>Email us</a>.
       </p>
     </div>
   );

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPage } from "@/components/public-page";
+import { COMPANY_DETAILS } from "@/shared/company-details";
 
 export const metadata: Metadata = {
   title: "Checkout cancelled",
@@ -19,7 +20,7 @@ export default function CheckoutCancelPage() {
           <p className="mx-auto mt-6 max-w-xl text-lg">If no payment completed, any temporary seat hold will release automatically. You can return to the workshop and try again when you’re ready.</p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link className="button button-primary" href="/workshops">Return to workshops</Link>
-            <a className="button border border-[var(--navy)]" href="mailto:brian@bncconsulting.co">Ask for help</a>
+            <a className="button border border-[var(--navy)]" href={`mailto:${COMPANY_DETAILS.email}`}>Ask for help</a>
           </div>
         </div>
       </section>
