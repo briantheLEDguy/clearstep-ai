@@ -20,6 +20,7 @@ export function getSupabaseBrowserClient() {
       auth: {
         autoRefreshToken: true,
         detectSessionInUrl: false,
+        // Keep automatic flow-ID redirects disabled until the query-aware live allowlist passes the deployment runbook.
         flowType: "pkce",
         persistSession: true,
       },

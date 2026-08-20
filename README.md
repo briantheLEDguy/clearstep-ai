@@ -55,7 +55,7 @@ npm test
 npm run test:a11y
 ```
 
-`npm test` builds the static export with the production BNC origin first, then runs the repository’s source and rendered-output contracts; this canonical test value deliberately overrides a developer’s local site URL. `npm run test:a11y` performs a self-contained static build with a local intercepted Supabase endpoint, so Playwright can prove that browser analytics does not contact production. When Docker is available, also run `npm run test:db`; it starts a disposable local Supabase stack and applies every migration before its pgTAP assertions. None of these replace Stripe, Google, or production-provider acceptance testing.
+`npm test` builds the static export with the production BNC origin first, then runs the repository’s source and rendered-output contracts; this canonical test value deliberately overrides a developer’s local site URL. `npm run test:a11y` performs a self-contained static build with a local intercepted Supabase endpoint, so Playwright can prove that browser analytics does not contact production and exercise mocked Auth checks for Google redirect initiation, callback success and failure, and signed-in public navigation. When Docker is available, also run `npm run test:db`; it starts a disposable local Supabase stack and applies every migration before its pgTAP assertions. These mocked checks do not prove live Supabase or Google configuration, and none of the repository suites replace Stripe, Google, or production-provider acceptance testing.
 
 ## Configuration boundaries
 

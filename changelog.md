@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-08-20 — Sign-in reliability and account feedback
+
+### Changed
+
+- Added distinct Google-redirect and email-link progress states, actionable callback failure handling, and clearer signed-in confirmation instead of leaving an Auth flow on an indefinite or misleading loading state.
+- Made the public account control session-aware so a completed sign-in is reflected by an accessible account link rather than the unchanged `Sign in` action.
+- Removed one-time Auth callback parameters from browser history before displaying recovery actions or navigating onward.
+
+### Verification
+
+- Added mocked browser coverage for Google redirect initiation, Auth callback success and failure, and signed-in public-navigation state without contacting the production Supabase project.
+
+### Operational note
+
+- Repository checks do not prove that Supabase Auth, Google, Cloudflare, or their production redirect settings were changed or accepted. Fresh sign-in acceptance evidence on the canonical host remains required before automatic PKCE flow-ID redirects are enabled.
+
 ## 2026-08-19 — BNC multi-service platform and Cloudflare Pages preparation
 
 ### Added

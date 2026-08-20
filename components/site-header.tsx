@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import AdminNavLink from "@/components/admin/AdminNavLink";
+import { AuthNavAction } from "@/components/auth-nav-action";
 import { BrandLogo } from "@/components/brand-logo";
 import { getBrand, type BrandKey } from "@/lib/brands";
 
@@ -21,7 +22,7 @@ export function SiteHeader({ brandKey }: { brandKey: BrandKey }) {
       <nav aria-label="Primary navigation">
         {brand.navigation.map((item) => <Link href={item.href} key={item.href}>{item.label}</Link>)}
         <AdminNavLink />
-        <Link className="nav-sign-in" href="/sign-in">Sign in</Link>
+        <AuthNavAction />
       </nav>
     </header>
   );

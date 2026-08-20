@@ -108,6 +108,12 @@ a { color: inherit; text-decoration: none; }
   .site-header nav a:hover, .site-header nav a:focus-visible { color: var(--color-action); }
   .nav-admin { color: var(--color-action); font-weight: 800; }
   .nav-sign-in { border: 1.5px solid var(--color-text); border-radius: 999px; padding: 8px 17px; }
+  .nav-account-action, .nav-account-loading { width: 42px; height: 42px; flex: 0 0 42px; border-radius: 999px; }
+  .nav-account-loading { border: 1.5px solid var(--color-border); background: color-mix(in srgb, var(--color-text), transparent 92%); }
+  .nav-account-action { position: relative; display: grid; place-items: center; border: 1.5px solid var(--color-text); background: var(--color-text); color: var(--color-card); }
+  .nav-account-action svg { width: 23px; height: 23px; fill: currentColor; }
+  .site-header nav .nav-account-action:hover, .site-header nav .nav-account-action:focus-visible { background: var(--color-action); border-color: var(--color-action); color: var(--color-on-action); }
+  .nav-account-badge { position: absolute; right: -3px; bottom: -2px; display: grid; width: 17px; height: 17px; place-items: center; border: 2px solid var(--color-surface); border-radius: 999px; background: var(--color-positive); color: white; font-size: 10px; font-weight: 900; line-height: 1; }
 
 .hero {
   min-height: 590px;
